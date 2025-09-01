@@ -1,3 +1,8 @@
+/**
+ * 个人资料：
+ * - 修改用户名（发言优先显示）、邮箱、密码
+ * - “账号注销”按钮为占位（无需实现）
+ */
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common'; import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
@@ -7,25 +12,25 @@ import { AuthService } from '../../core/services/auth.service';
   selector:'app-profile',
   template:`
   <div class="card stack" *ngIf="auth.currentUser(); else needLogin">
-    <h3>个人资料</h3>
-    <label class="small">昵称</label>
-    <input class="input" [(ngModel)]="username" name="username" placeholder="昵称（可选）">
+    <h3>profile</h3>
+    <label class="small">username</label>
+    <input class="input" [(ngModel)]="username" name="username" placeholder="username（optional）">
 <br>
-    <label class="small">电子邮件</label>
+    <label class="small">email</label>
     <input class="input" [(ngModel)]="email" name="email">
 <br>
-    <label class="small">密码</label>
+    <label class="small">password</label>
     <input class="input" type="password" [(ngModel)]="password" name="password">
 <br>
     <div class="row">
-      <button class="btn" (click)="save()">保存</button>
-      <button class="btn" style="background:#64748b" title="占位功能">账号注销</button>
+      <button class="btn" (click)="save()">save</button>
+      <button class="btn" style="background:#64748b" title="占位功能">Account deletion</button>
     </div>
-    <div class="small">当前展示名：<b>{{ auth.displayName() }}</b></div>
+    <div class="small">Current user：<b>{{ auth.displayName() }}</b></div>
   </div>
 
   <ng-template #needLogin>
-    <div class="card">请先 <a routerLink="/login">登录</a></div>
+    <div class="card">plase <a routerLink="/login">login</a></div>
   </ng-template>
   `,
   imports:[CommonModule, FormsModule]

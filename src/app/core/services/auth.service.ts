@@ -1,3 +1,10 @@
+/**
+ * 认证服务：
+ * - login / logout / register
+ * - currentUser / displayName
+ * - updateProfile
+ * 注意：Phase 1 使用 localStorage；Phase 2 会改为后端 + 数据库
+ */
 import { Injectable } from '@angular/core';
 import { StorageService } from './storage.service';
 import { User } from '../models';
@@ -9,24 +16,27 @@ export class AuthService {
   isLoggedIn(): boolean { return !!this.currentUser(); }
   currentUser(): User | null { return this.store.authUser(); }
 
-  // 发言展示名：优先 username，否则 email
+  /** 发言显示名：优先 username（自定义昵称），否则 email */
   displayName(): string {
     const u = this.currentUser();
     return u ? (u.username?.trim() || u.email) : '';
   }
 
+  /** 登录：邮箱 + 密码（Phase 1：对比 localStorage） */
   login(email: string, password: string): User {
     const found = this.store.users().find(u => u.email === email && u.password === password);
-    if (!found) throw new Error('邮箱或密码错误');
+    if (!found) throw new Error('email or password error');
     this.store.setAuthUser(found);
     return found;
   }
 
+  /** 退出登录：清空登录态 */
   logout(){ this.store.setAuthUser(null); }
 
+  /** 注册：创建新用户并直接登录 */
   register(payload: {email:string; password:string; username?:string}): User {
     const users = this.store.users();
-    if (users.some(u => u.email === payload.email)) throw new Error('邮箱已被注册');
+    if (users.some(u => u.email === payload.email)) throw new Error('The email has already been registered');
     const newUser: User = {
       id: 'u'+(users.length+1),
       email: payload.email,
@@ -41,6 +51,7 @@ export class AuthService {
     return newUser;
   }
 
+  /** 修改个人资料：用户名/邮箱/密码 */
   updateProfile(patch: Partial<Pick<User,'username'|'email'|'password'>>){
     const u = this.currentUser(); if (!u) return;
     const users = this.store.users();
@@ -48,7 +59,7 @@ export class AuthService {
     if (idx>=0){
       users[idx] = {...u, ...patch};
       this.store.saveUsers(users);
-      this.store.setAuthUser(users[idx]);
+      this.store.setAuthUser(users[idx]); // 同步登录态
     }
   }
 }

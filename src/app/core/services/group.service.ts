@@ -1,3 +1,9 @@
+/**
+ * 群组/频道相关读取与简单加入逻辑（localStorage）
+ * - 列出全部群组/频道（广场）
+ * - 列出我的群组（聊天页左侧）
+ * - 加入群组（占位：不做审批流）
+ */
 import { Injectable } from '@angular/core';
 import { StorageService } from './storage.service';
 import { Channel, Group, User } from '../models';
@@ -22,9 +28,11 @@ export class GroupService {
     const groups = this.store.groups();
     const g = groups.find(x=>x.id===groupId); if (!g) return;
     if (!g.memberIds.includes(user.id)) g.memberIds.push(user.id);
+
     const users = this.store.users();
     const idx = users.findIndex(u=>u.id===user.id);
     if (idx>=0 && !users[idx].groups.includes(groupId)) users[idx].groups.push(groupId);
+
     this.store.saveUsers(users);
     localStorage.setItem('groups', JSON.stringify(groups));
   }

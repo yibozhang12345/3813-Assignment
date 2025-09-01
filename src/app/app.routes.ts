@@ -1,4 +1,11 @@
+/**
+ * 全站路由表：
+ * - 未登录仍可访问 /login /register
+ * - 登录后访问 /plaza /chat /notifications /profile
+ * 备注：此处未加守卫（Phase 1 可选）
+ */
 import { Routes } from '@angular/router';
+
 import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { ProfileComponent } from './pages/profile/profile.component';
@@ -14,5 +21,5 @@ export const routes: Routes = [
   { path: 'chat', component: ChatComponent },
   { path: 'notifications', component: NotificationsComponent },
   { path: 'profile', component: ProfileComponent },
-  { path: '**', redirectTo: 'plaza' }
+  { path: '**', redirectTo: 'plaza' },
 ];
