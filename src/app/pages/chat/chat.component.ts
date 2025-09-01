@@ -65,7 +65,14 @@ import { Group, Channel } from '../../core/models';
   styles: [`
     ul{list-style:none;margin:6px 0;padding:0}
     li{padding:6px 8px;border-radius:8px;cursor:pointer}
-    li.sel, li:hover{ /* hover 样式在 app.css 里可按需分开 */ }
+        li.sel {
+  background: #fffacd;   /* 淡黄色 */
+  color: black;          /* 确保文字颜色可读 */
+}
+
+li:hover {
+  background: #fef3c7;   /* 鼠标悬停时用淡黄色 */
+}
     .multiline{ white-space:pre-line; } /* 让 \n 换行生效 */
   `],
   imports: [CommonModule, FormsModule],
