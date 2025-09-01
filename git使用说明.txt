@@ -1,0 +1,8 @@
+新建：
+git网站新建项目
+复制
+任务 5：提交和合并更改
+git add .
+git commit -m "备注"
+#将更改推送到git网站：
+git push origin main
