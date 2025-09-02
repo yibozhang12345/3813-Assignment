@@ -34,19 +34,32 @@ const io = new Server(server, {
 
 // 监听客户端连接
 io.on('connection', (socket) => {
-  console.log('socket connected:', socket.id);
+  console.log('connected:', socket.id);
 
-  // 监听前端发送的消息事件，并广播给所有客户端
-  socket.on('newmsg', (msg) => {
-    console.log('recv:', msg);
-    io.emit('newmsg', msg); // 广播给所有客户端
+  // 客户端选中频道时调用：{ channelId }
+  socket.on('joinChannel', ({ channelId }) => {
+    // 离开之前所有房间（默认房间除外）
+    for (const room of socket.rooms) {
+      if (room !== socket.id) socket.leave(room);
+    }
+    if (channelId) {
+      socket.join(channelId);
+      console.log(`${socket.id} joined room ${channelId}`);
+    }
   });
 
-  socket.on('disconnect', () => console.log('socket disconnected:', socket.id));
+  // 发消息：{ user, text, groupId?, channelId? }
+  socket.on('newmsg', (payload) => {
+    const { channelId } = payload || {};
+    if (channelId) {
+      // 只发给该频道房间
+      io.to(channelId).emit('newmsg', payload);
+    } else {
+      // 兜底：未带频道则全局广播
+      io.emit('newmsg', payload);
+    }
+  });
+
+  socket.on('disconnect', () => console.log('disconnected:', socket.id));
 });
 
-// 启动服务器
-const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`Phase1 server listening on http://localhost:${PORT}`);
-});

@@ -16,18 +16,19 @@ import { Group } from '../../core/models';
 
     <!-- all groups -->
     <div *ngFor="let g of groups" class="stack"
-         style="margin:10px 0;padding:12px;border:1px solid #1f2937;border-radius:8px">
+         style="margin:10px 0;padding:30px;border:1px solid #1f2937;border-radius:8px;width: 25%;">
       <div><b>{{ g.name }}</b> <span class="small">(#{{ g.id }})</span></div>
 
-      <div class="small">channels</div>
+      <div class="small">channels：</div>
       <div class="row" style="flex-wrap:wrap">
         <!-- 展示某个群组下的频道 -->
-        <span *ngFor="let c of channelsOf(g.id)" class="chip">#{{ c.name }}</span>
+        <span *ngFor="let c of channelsOf(g.id)" class="chip">{{ c.name }}<br></span>
       </div>
     </div>
   </div>
   `,
-  styles: [`.chip{background:#172554;color:#e5e7eb;padding:6px 10px;border-radius:999px;border:1px solid #1f2937}`],
+  styles: [`.chip{  
+  padding: 6px 12px;       /* 内边距，让背景比文字稍大 */}`],
   imports: [CommonModule],
 })
 export class PlazaComponent implements OnInit {
@@ -39,6 +40,5 @@ export class PlazaComponent implements OnInit {
     // 初始化时加载所有群组
     this.groups = this.groupSvc.allGroups();
   }
-
   channelsOf(id: string) { return this.groupSvc.channelsOfGroup(id); }
 }

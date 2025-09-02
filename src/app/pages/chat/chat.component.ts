@@ -1,10 +1,3 @@
-/**
- * 聊天页：
- * - 左侧：我加入的群组 → 频道
- * - 右侧：消息区域 + 发言框
- * - 发言内容带上“显示名（username 优先）”、groupId、channelId
- * - 频道选中样式见 app.css 的 li.sel
- */
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -23,7 +16,7 @@ import { Group, Channel } from '../../core/models';
     <div class="row">
       <!-- 左侧：我的群组与频道 -->
       <div class="stack" style="min-width:240px;flex:0 0 260px">
-        <div class="small">group</div>
+        <div class="small">groups</div>
         <ul>
           <li *ngFor="let g of myGroups"
               [class.sel]="g.id===activeGroupId"
@@ -42,16 +35,15 @@ import { Group, Channel } from '../../core/models';
         </ul>
       </div>
 
-      <!-- 右侧：聊天区 -->
+      <!-- 右侧：聊天区（只显示当前频道的消息） -->
       <div class="stack" style="flex:1">
         <div class="card" style="min-height:240px">
-          <div class="small" *ngIf="!activeChannelId">Please select the channel on the left to start chatting</div>
-          <!-- 简单消息列表 -->
-          <div class="multiline" *ngFor="let m of feed">{{ m }}</div>
+          <div class="small" *ngIf="!activeChannelId">Select a group or channel to start chatting</div>
+          <div class="multiline" *ngFor="let m of viewFeed">{{ m }}</div>
         </div>
 
         <form class="row" (ngSubmit)="send()" *ngIf="activeChannelId">
-          <input class="input" [(ngModel)]="text" name="text" required>
+          <input class="input" [(ngModel)]="text" name="text" placeholder="Please enter..." required>
           <button class="btn" type="submit">send</button>
         </form>
       </div>
@@ -59,21 +51,28 @@ import { Group, Channel } from '../../core/models';
   </div>
 
   <ng-template #needLogin>
-    <div class="card">please <a routerLink="/login">login</a></div>
+    <div class="card">plaese <a routerLink="/login">login</a></div>
   </ng-template>
   `,
   styles: [`
-    ul{list-style:none;margin:6px 0;padding:0}
-    li{padding:6px 8px;border-radius:8px;cursor:pointer}
-        li.sel {
-  background: #fffacd;   /* 淡黄色 */
-  color: black;          /* 确保文字颜色可读 */
+    ul {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: flex;        /* 如果希望一行排列，可以加这句 */
+  flex-wrap: wrap;      /* 允许换行 */
+  gap: 8px;             /* 标签之间的间距 */
 }
 
-li:hover {
-  background: #fef3c7;   /* 鼠标悬停时用淡黄色 */
+li {
+  display: inline-block;   /* 关键：改为 inline-block，而不是 block */
+  padding: 6px 12px;       /* 内边距，让背景比文字稍大 */
+  border-radius: 8px;
+  cursor: pointer;
 }
-    .multiline{ white-space:pre-line; } /* 让 \n 换行生效 */
+    li.sel{ background:#fffacd; color:#111; }  /* 已选频道淡黄色 */
+    li:hover{ background:orange; }
+    .multiline{ white-space:pre-line; }       /* 让 \\n 生效 */
   `],
   imports: [CommonModule, FormsModule],
 })
@@ -83,7 +82,11 @@ export class ChatComponent implements OnInit {
   activeGroupId?: string;
   activeChannelId?: string;
 
-  feed: string[] = [];   // 简单的消息列表
+  /** 每个频道的消息独立存储：feeds[channelId] = string[] */
+  private feeds: Record<string, string[]> = {};
+  /** 当前显示的消息（指向 feeds[activeChannelId]） */
+  viewFeed: string[] = [];
+
   text = '';
 
   constructor(
@@ -93,12 +96,25 @@ export class ChatComponent implements OnInit {
   ) {}
 
   ngOnInit(){
-    // 初始化：列出我的群组，并订阅消息
     this.myGroups = this.groupSvc.myGroups(this.auth.currentUser());
+
+    // 订阅来自后端的消息：只入库到对应频道
     this.sockets.onMessage().subscribe((msg:any)=>{
-      const by = msg?.user || '匿名';
-      const tag = msg?.channelId ? ` #${msg.channelId}` : '';
-      this.feed.push(`${by}${tag}: ${msg?.text}`);
+      const ch = msg?.channelId as string | undefined;
+      if (!ch) return; // 没带频道的不处理（也可放到某个“公共频道”）
+
+      // 组装展示文本：用户名（身份）：发言
+      const roles = (this.auth.currentUser()?.roles ?? []).join(', ') || 'user';
+      const display = `${msg?.user ?? '匿名'}（${roles}）：${msg?.text ?? ''}`;
+
+      // 推入该频道消息列表
+      this.feeds[ch] = this.feeds[ch] ?? [];
+      this.feeds[ch].push(display);
+
+      // 如果此时正在该频道，刷新右侧视图
+      if (this.activeChannelId === ch) {
+        this.viewFeed = this.feeds[ch];
+      }
     });
   }
 
@@ -106,23 +122,30 @@ export class ChatComponent implements OnInit {
     this.activeGroupId = g.id;
     this.channels = this.groupSvc.channelsOfGroup(g.id);
     this.activeChannelId = undefined;
+    this.viewFeed = [];
   }
 
   selectChannel(c:Channel){
     this.activeChannelId = c.id;
-    // 如果 server.js 做了“房间”机制，这里通知后端加入该频道
+
+    // 让后端把当前 socket 加入该频道“房间”
     this.sockets.joinChannel(c.id);
+
+    // 切换右侧消息为该频道的历史（本地内存）
+    this.viewFeed = this.feeds[c.id] ?? [];
   }
 
   send(){
     const content = this.text.trim();
-    if (!content) return;
+    if (!content || !this.activeChannelId) return;
+
     this.sockets.sendMessage({
-      user: this.auth.displayName(),
+      user: this.auth.displayName(),                 // 用户名（优先 username）
       text: content,
       groupId: this.activeGroupId,
-      channelId: this.activeChannelId,
+      channelId: this.activeChannelId,               // 必须携带频道
     });
-    this.text = ''; // 清空输入框
+
+    this.text = '';
   }
 }
