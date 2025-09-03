@@ -17,7 +17,7 @@ export class SocketsService {
   }
 
   /** 发送消息，必须携带 channelId 才能按频道分发 */
-  sendMessage(payload: { user: string; text: string; groupId?: string; channelId?: string }) {
+  sendMessage(payload: { user: string; roles?: string[]; text: string; groupId?: string; channelId?: string }) {
     this.socket.emit('newmsg', payload);
   }
 

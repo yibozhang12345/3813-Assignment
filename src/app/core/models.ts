@@ -1,16 +1,12 @@
-/**
- * 统一的数据模型接口（User / Group / Channel）
- * - username 为用户自定义显示名；发言时优先使用
- */
 export type Role = 'super' | 'groupAdmin' | 'user';
 
 export interface User {
   id: string;
   email: string;
-  password: string;   // Phase 1 演示用（明文存本地）；Phase 2 会改
-  username?: string;  // 自定义显示名
+  password: string;     // Phase 1：本地存储演示
+  username?: string;    // 自定义显示名（发言优先）
   roles: Role[];
-  groups: string[];   // 所属群组 ID 列表
+  groups: string[];     // 加入的群组
 }
 
 export interface Group {
@@ -18,11 +14,12 @@ export interface Group {
   name: string;
   ownerId: string;
   adminIds: string[];
-  memberIds: string[];
+  memberIds: string[];  // 组成员
 }
 
 export interface Channel {
   id: string;
   name: string;
-  groupId: string;    // 所属群组
+  groupId: string;
+  memberIds: string[];  // ✅ 频道成员（只有成员可见/可发言）
 }

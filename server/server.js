@@ -1,65 +1,119 @@
+// server/server.js
+// -------------------------------
+// Phase 1: Express + Socket.IO (rooms by channel)
+// 仅为演示/作业使用：没有数据库与鉴权
+// -------------------------------
+
 const express = require('express');
-const cors = require('cors');
 const http = require('http');
+const cors = require('cors');
 const { Server } = require('socket.io');
 
+const PORT = process.env.PORT || 3000;
+const FRONT_ORIGIN = process.env.FRONT_ORIGIN || 'http://localhost:4200';
+
 const app = express();
-app.use(cors({ origin: 'http://localhost:4200' })); // 允许来自 Angular 前端的跨域请求
-app.use(express.json()); // 支持 JSON 格式的请求体
+app.use(cors({ origin: FRONT_ORIGIN })); // 允许 Angular 前端跨域
+app.use(express.json());
 
-// ---- Mock APIs (Phase 1) ---- //
+// ---------------- Mock APIs（可选） ----------------
 
-// 一个模拟用户（Phase 1 阶段不接数据库，直接写死数据）
-const MOCK_USER = { username: 'super', email: 'super@x.com', roles: ['super'] };
-
-// 登录接口：用户名=super 且密码=123 时返回成功；其他情况返回 401
+// 示例：简单登录（密码=123 则通过），返回一个“用户对象”用于前端显示
 app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if ((username === 'super' && password === '123') || password === '123') {
-    return res.json({ ...MOCK_USER, username });
-  }
-  return res.status(401).json({ error: 'invalid credentials' });
+  const { username, email, password } = req.body || {};
+  if (password !== '123') return res.status(401).json({ error: 'invalid credentials' });
+
+  // 最简用户对象（Phase 1）
+  const name = (username && username.trim()) || (email && email.trim()) || 'user';
+  const mock = {
+    id: 'u_mock',
+    username: name,
+    email: email || `${name}@example.com`,
+    roles: name === 'super' ? ['super'] : ['user'],
+    groups: ['g1'], // 示例：默认在 g1
+  };
+  return res.json(mock);
 });
 
-// 群组接口（仅返回一个示例组）
+// 示例：返回群组
 app.get('/api/groups', (_req, res) => {
-  res.json([{ id: 'g1', name: 'General' }]);
+  res.json([{ id: 'g1', name: 'General' }, { id: 'g2', name: 'Tech' }]);
 });
 
-// ---- Socket.IO (Phase 1 占位) ---- //
+// -------------------------------------------------
+
+// 创建 HTTP + Socket.IO 服务器
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: 'http://localhost:4200', methods: ['GET', 'POST'] }
+  cors: { origin: FRONT_ORIGIN, methods: ['GET', 'POST'] },
 });
 
-// 监听客户端连接
+// ---- Socket.IO：按频道分房间分发消息 ---- //
+// 事件命名：
+// - joinChannel:  客户端选择频道后调用，加入对应房间
+// - leaveChannel: 客户端切换/离开频道（可选）
+// - newmsg:       发送消息，要求 payload.channelId 存在
 io.on('connection', (socket) => {
-  console.log('connected:', socket.id);
+  console.log('[io] connected:', socket.id);
 
-  // 客户端选中频道时调用：{ channelId }
+  // 加入频道（房间）
   socket.on('joinChannel', ({ channelId }) => {
-    // 离开之前所有房间（默认房间除外）
+    // 先离开除自身默认房间外的所有房间，避免收到其它频道消息
     for (const room of socket.rooms) {
       if (room !== socket.id) socket.leave(room);
     }
+
     if (channelId) {
       socket.join(channelId);
-      console.log(`${socket.id} joined room ${channelId}`);
+      console.log(`[io] ${socket.id} joined room ${channelId}`);
+      // 也可回发一个确认
+      socket.emit('joined', { channelId });
     }
   });
 
-  // 发消息：{ user, text, groupId?, channelId? }
-  socket.on('newmsg', (payload) => {
-    const { channelId } = payload || {};
+  // 可选：主动离开频道
+  socket.on('leaveChannel', ({ channelId }) => {
     if (channelId) {
-      // 只发给该频道房间
-      io.to(channelId).emit('newmsg', payload);
-    } else {
-      // 兜底：未带频道则全局广播
-      io.emit('newmsg', payload);
+      socket.leave(channelId);
+      console.log(`[io] ${socket.id} left room ${channelId}`);
     }
   });
 
-  socket.on('disconnect', () => console.log('disconnected:', socket.id));
+  // 收到前端消息：{ user, roles?, text, groupId?, channelId }
+  socket.on('newmsg', (payload = {}) => {
+    const { channelId, user, roles, text } = payload;
+
+    // 基本校验：必须带 channelId
+    if (!channelId) {
+      console.warn('[io] newmsg dropped: missing channelId');
+      return;
+    }
+    if (!text || !String(text).trim()) {
+      console.warn('[io] newmsg dropped: empty text');
+      return;
+    }
+
+    // 规范化消息（服务器时间戳等可附加）
+    const out = {
+      user: user || 'Anonymous',
+      roles: Array.isArray(roles) ? roles : [],
+      text: String(text),
+      channelId,
+      ts: Date.now(),
+    };
+
+    // 仅广播给该频道房间
+    io.to(channelId).emit('newmsg', out);
+    console.log(`[io] msg -> room ${channelId}:`, `${out.user}(${out.roles.join(',')})`, out.text);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('[io] disconnected:', socket.id);
+  });
 });
 
+// 启动
+server.listen(PORT, () => {
+  console.log(`Phase 1 server listening on http://localhost:${PORT}`);
+  console.log(`CORS allowed origin: ${FRONT_ORIGIN}`);
+});

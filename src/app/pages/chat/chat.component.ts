@@ -86,7 +86,6 @@ export class ChatComponent implements OnInit {
   private feeds: Record<string, string[]> = {};
   /** 当前显示的消息（指向 feeds[activeChannelId]） */
   viewFeed: string[] = [];
-
   text = '';
 
   constructor(
@@ -120,32 +119,29 @@ export class ChatComponent implements OnInit {
 
   selectGroup(g:Group){
     this.activeGroupId = g.id;
+    const me = this.auth.currentUser()!;    // ✅ 只显示我加入的频道
     this.channels = this.groupSvc.channelsOfGroup(g.id);
     this.activeChannelId = undefined;
     this.viewFeed = [];
   }
 
   selectChannel(c:Channel){
-    this.activeChannelId = c.id;
-
-    // 让后端把当前 socket 加入该频道“房间”
-    this.sockets.joinChannel(c.id);
-
-    // 切换右侧消息为该频道的历史（本地内存）
+    this.activeChannelId = c.id;// 让后端把当前 socket 加入该频道“房间”
+    this.sockets.joinChannel(c.id);// 切换右侧消息为该频道的历史（本地内存）
     this.viewFeed = this.feeds[c.id] ?? [];
   }
 
   send(){
     const content = this.text.trim();
     if (!content || !this.activeChannelId) return;
-
+    const me = this.auth.currentUser()!;
     this.sockets.sendMessage({
-      user: this.auth.displayName(),                 // 用户名（优先 username）
+      user: this.auth.displayName(),
+      roles: me.roles,                   // ✅ 带上“身份”
       text: content,
       groupId: this.activeGroupId,
-      channelId: this.activeChannelId,               // 必须携带频道
+      channelId: this.activeChannelId,
     });
-
     this.text = '';
   }
 }
