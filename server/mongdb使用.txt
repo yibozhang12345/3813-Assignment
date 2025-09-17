@@ -1,0 +1,16 @@
+每次运行前先清空 products 集合以防止数据重复
+*数据库为users/mydb/products
+# 1) 插入样例数据
+node add.js
+
+# 2) 查看数据
+node read.js
+
+# 3) 更新 id=2 的产品（示例）
+node update.js 2 name="New Phone" price=899.99 units=12
+
+# 4) 删除 id=3 的产品
+node remove.js 3
+
+# 5) 再次查看
+node read.js

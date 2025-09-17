@@ -1,0 +1,37 @@
+<div class="row" style="justify-content:space-between;align-items:center">
+  <h2>Products</h2>
+  <button (click)="toAdd()">+ Add</button>
+</div>
+
+<div *ngIf="loading">Loading...</div>
+<div *ngIf="error" style="color:#b91c1c">{{ error }}</div>
+
+<table *ngIf="!loading && products.length" border="1" cellpadding="8" cellspacing="0" width="100%">
+  <thead>
+    <tr>
+      <th>#ID</th>
+      <th>Name</th>
+      <th>Description</th>
+      <th>Price</th>
+      <th>Units</th>
+      <th width="160">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let p of products; trackBy: trackById">
+      <td>{{ p.id }}</td>
+      <td>{{ p.name }}</td>
+      <td>{{ p.description }}</td>
+      <td>{{ p.price | number:'1.2-2' }}</td>
+      <td>{{ p.units }}</td>
+      <td>
+        <button (click)="toEdit(p)">Edit</button>
+        <button (click)="remove(p)" style="margin-left:8px;background:#b91c1c;color:#fff">Delete</button>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<div *ngIf="!loading && !products.length" style="color:#6b7280">
+  No products yet. Click “Add”.
+</div>

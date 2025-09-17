@@ -1,0 +1,33 @@
+<h2>Add Product</h2>
+
+<form (ngSubmit)="submit()" #f="ngForm" style="max-width:480px">
+  <div style="margin:8px 0">
+    <label>ID</label><br />
+    <input type="number" name="id" [(ngModel)]="model.id" required />
+  </div>
+
+  <div style="margin:8px 0">
+    <label>Name</label><br />
+    <input type="text" name="name" [(ngModel)]="model.name" required />
+  </div>
+
+  <div style="margin:8px 0">
+    <label>Description</label><br />
+    <textarea name="description" [(ngModel)]="model.description" rows="3"></textarea>
+  </div>
+
+  <div style="margin:8px 0">
+    <label>Price</label><br />
+    <input type="number" step="0.01" name="price" [(ngModel)]="model.price" />
+  </div>
+
+  <div style="margin:8px 0">
+    <label>Units</label><br />
+    <input type="number" name="units" [(ngModel)]="model.units" />
+  </div>
+
+  <div *ngIf="error" style="color:#b91c1c;margin:8px 0">{{ error }}</div>
+
+  <button [disabled]="saving">{{ saving ? 'Saving...' : 'Save' }}</button>
+  <a routerLink="/products" style="margin-left:8px">Cancel</a>
+</form>
