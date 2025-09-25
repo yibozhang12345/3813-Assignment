@@ -11,6 +11,8 @@ import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { GroupService } from '../../core/services/group.service';
 import { SocketsService } from '../../core/services/sockets.service';
+import { VideoCallService } from '../../core/services/video-call.service';
+import { VideoCallComponent } from '../../components/video-call/video-call.component';
 import { Group, Channel, User } from '../../core/models';
 
 interface Message {
@@ -64,8 +66,19 @@ interface Message {
       <!-- 右侧：聊天区域 / Right side: Chat area -->
       <div class="chat-area">
         <div class="chat-header" *ngIf="activeChannel">
-          <h4>#{{ activeChannel.name }}</h4>
-          <div class="small">{{ activeChannel.description }}</div>
+          <div class="header-info">
+            <h4>#{{ activeChannel.name }}</h4>
+            <div class="small">{{ activeChannel.description }}</div>
+          </div>
+          <div class="header-actions">
+            <button
+              class="video-call-btn"
+              (click)="showOnlineUsersModal()"
+              [disabled]="videoCallService.isInCall()"
+              title="Start video call / 开始视频通话">
+              📹 {{ 'Video Call / 视频通话' }}
+            </button>
+          </div>
         </div>
 
         <div class="messages-container" #messagesContainer>
@@ -158,6 +171,42 @@ interface Message {
     </div>
   </div>
 
+  <!-- 在线用户模态框 / Online users modal -->
+  <div class="modal" *ngIf="showUsersModal" (click)="closeUsersModal()">
+    <div class="modal-content users-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ 'Start Video Call / 开始视频通话' }}</h3>
+        <button class="modal-close" (click)="closeUsersModal()">❌</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="loading" *ngIf="loadingUsers">{{ 'Loading users... / 加载用户中...' }}</div>
+
+        <div class="user-list" *ngIf="!loadingUsers">
+          <div class="user-item" *ngFor="let user of onlineUsers" (click)="startVideoCall(user)">
+            <img
+              [src]="user.avatarUrl || '/assets/default-avatar.svg'"
+              alt="Avatar"
+              class="user-avatar"
+              (error)="onAvatarError($event)">
+            <div class="user-info">
+              <div class="user-name">{{ user.username }}</div>
+              <div class="user-status">{{ 'Online / 在线' }}</div>
+            </div>
+            <div class="call-btn">📞</div>
+          </div>
+
+          <div class="no-users" *ngIf="onlineUsers.length === 0">
+            {{ 'No online users available for video call / 没有在线用户可进行视频通话' }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 视频通话组件 / Video call component -->
+  <app-video-call></app-video-call>
+
   <ng-template #needLogin>
     <div class="card">
       {{ 'Please' }} <a routerLink="/login">{{ 'login / 登录' }}</a> {{ 'to use chat / 使用聊天功能' }}
@@ -223,12 +272,38 @@ interface Message {
       min-height: 0;
     }
     .chat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       padding: 1rem;
       border-bottom: 1px solid #ddd;
       background: #f8f9fa;
     }
-    .chat-header h4 {
+    .header-info h4 {
       margin: 0 0 0.25rem 0;
+    }
+    .header-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .video-call-btn {
+      padding: 0.5rem 1rem;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .video-call-btn:hover:not(:disabled) {
+      background-color: #218838;
+    }
+    .video-call-btn:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
     }
     .messages-container {
       flex: 1;
@@ -440,8 +515,77 @@ interface Message {
     a:hover {
       text-decoration: underline;
     }
+    .users-modal {
+      max-width: 500px;
+      width: 90%;
+      max-height: 600px;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid #ddd;
+      margin: -1rem -1rem 1rem -1rem;
+      background: #f8f9fa;
+    }
+    .modal-header h3 {
+      margin: 0;
+      color: #495057;
+    }
+    .modal-body {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .user-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .user-item {
+      display: flex;
+      align-items: center;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .user-item:hover {
+      background-color: #f8f9fa;
+      border-color: #007bff;
+      transform: translateY(-1px);
+    }
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 1rem;
+    }
+    .user-info {
+      flex: 1;
+    }
+    .user-name {
+      font-weight: bold;
+      color: #495057;
+    }
+    .user-status {
+      font-size: 0.8rem;
+      color: #28a745;
+    }
+    .call-btn {
+      font-size: 1.2rem;
+      color: #007bff;
+    }
+    .no-users {
+      text-align: center;
+      color: #6c757d;
+      padding: 2rem;
+      font-style: italic;
+    }
   `],
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, VideoCallComponent],
 })
 export class ChatComponent implements OnInit, OnDestroy {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
@@ -461,6 +605,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   previewUrl: string | null = null;
   modalImageUrl: string | null = null;
 
+  // 视频通话相关属性 / Video call related properties
+  showUsersModal = false;
+  onlineUsers: User[] = [];
+  loadingUsers = false;
+
   loadingGroups = false;
   loadingChannels = false;
   loadingMessages = false;
@@ -469,7 +618,8 @@ export class ChatComponent implements OnInit, OnDestroy {
   constructor(
     public auth: AuthService,
     private groupService: GroupService,
-    private sockets: SocketsService
+    private sockets: SocketsService,
+    public videoCallService: VideoCallService
   ) {}
 
   ngOnInit() {
@@ -686,6 +836,42 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   closeImageModal() {
     this.modalImageUrl = null;
+  }
+
+  // 显示在线用户模态框 / Show online users modal
+  showOnlineUsersModal() {
+    this.showUsersModal = true;
+    this.loadOnlineUsers();
+  }
+
+  // 关闭用户模态框 / Close users modal
+  closeUsersModal() {
+    this.showUsersModal = false;
+    this.onlineUsers = [];
+  }
+
+  // 加载在线用户 / Load online users
+  loadOnlineUsers() {
+    this.loadingUsers = true;
+    // 监听在线用户列表 / Listen for online users list
+    this.sockets.onOnlineUsers()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((users: User[]) => {
+        const currentUser = this.auth.getCurrentUser();
+        // 过滤掉当前用户 / Filter out current user
+        this.onlineUsers = users.filter(user => user._id !== currentUser?._id);
+        this.loadingUsers = false;
+      });
+  }
+
+  // 开始视频通话 / Start video call
+  async startVideoCall(targetUser: User) {
+    try {
+      await this.videoCallService.initiateCall(targetUser._id, targetUser.username);
+      this.closeUsersModal();
+    } catch (error) {
+      console.error('Failed to start video call:', error);
+    }
   }
 
   private scrollToBottom() {

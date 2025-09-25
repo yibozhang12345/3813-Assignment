@@ -132,15 +132,17 @@ async function startServer() {
       }
     });
 
-    // 启动服务器 / Start server
+    // 启动主服务器 / Start main server
     server.listen(PORT, () => {
       console.log(`🚀 Phase 2 server listening on http://localhost:${PORT}`);
       console.log(`🌐 CORS allowed origin: ${FRONT_ORIGIN}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`💬 Real-time chat with Socket.IO enabled`);
       console.log(`📁 File upload support enabled`);
-      console.log(`🎥 Video chat with PeerJS support enabled`);
     });
+
+    // 启动PeerJS信令服务器 / Start PeerJS signaling server
+    require('./peerjs-server');
 
   } catch (error) {
     console.error('❌ Failed to start server / 服务器启动失败:', error);
