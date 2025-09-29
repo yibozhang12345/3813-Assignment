@@ -1,0 +1,8 @@
+<h2>Create Channel</h2>
+<form (ngSubmit)="createChannel()">
+  <input type="text" [(ngModel)]="channelName" name="channelName" placeholder="Channel Name" required>
+  <button type="submit">Create</button>
+</form>
+
+<p *ngIf="message" style="color: green">{{ message }}</p>
+<p *ngIf="error" style="color: red">{{ error }}</p>

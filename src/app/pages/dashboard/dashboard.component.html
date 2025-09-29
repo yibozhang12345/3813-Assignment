@@ -1,0 +1,16 @@
+<h2>Welcome, {{ user?.username }}</h2>
+
+<div *ngIf="user?.groups?.length > 0">
+  <h3>Your Groups</h3>
+  <ul>
+    <li *ngFor="let groupId of user.groups">
+      <button (click)="goToGroup(groupId)">Go to Group {{ groupId }}</button>
+      <button (click)="logout()">Logout</button>
+
+    </li>
+  </ul>
+</div>
+
+<div *ngIf="user?.groups?.length === 0">
+  <p>You are not in any groups.</p>
+</div>

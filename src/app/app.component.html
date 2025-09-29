@@ -1,0 +1,22 @@
+<nav class="nav">
+  <div class="brand">3813ICT–Phase 1</div>
+
+  <ul class="menu" *ngIf="isLoggedIn(); else guest">
+    <li class="spacer"></li>
+    <li class="user">
+      <span>{{ displayName() }}</span>
+      <button (click)="logout()">Logout</button>
+    </li>
+  </ul>
+
+  <ng-template #guest>
+    <ul class="menu">
+      <li><a routerLink="/login" routerLinkActive="active">login</a></li>
+      <li><a routerLink="/register" routerLinkActive="active">register</a></li>
+    </ul>
+  </ng-template>
+</nav>
+
+<main>
+  <router-outlet></router-outlet>
+</main>

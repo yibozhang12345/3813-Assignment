@@ -1,0 +1,8 @@
+<h2>Create Group</h2>
+<form (ngSubmit)="createGroup()">
+  <input type="text" [(ngModel)]="groupName" name="groupName" placeholder="Group Name" required>
+  <button type="submit">Create</button>
+</form>
+
+<p *ngIf="message" style="color: green">{{ message }}</p>
+<p *ngIf="error" style="color: red">{{ error }}</p>
