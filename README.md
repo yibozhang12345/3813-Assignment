@@ -486,10 +486,6 @@ npm test
 
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
-## 作者
-
-- **yingzi** - *初始开发* - [yingzi4f@hotmail.com](mailto:yingzi4f@hotmail.com)
-
 ## 致谢
 
 - Angular 团队提供优秀的前端框架
