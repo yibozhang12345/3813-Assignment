@@ -1,52 +1,140 @@
 const express = require('express');
-const cors = require('cors');
 const http = require('http');
-const { Server } = require('socket.io');
+const socketIo = require('socket.io');
+const cors = require('cors');
+const path = require('path');
+
+const authRoutes = require('./routes/auth');
+const groupRoutes = require('./routes/groups');
+const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
-app.use(cors({ origin: 'http://localhost:4200' })); // 允许来自 Angular 前端的跨域请求
-app.use(express.json()); // 支持 JSON 格式的请求体
-
-// ---- Mock APIs (Phase 1) ---- //
-
-// 一个模拟用户（Phase 1 阶段不接数据库，直接写死数据）
-const MOCK_USER = { username: 'super', email: 'super@x.com', roles: ['super'] };
-
-// 登录接口：用户名=super 且密码=123 时返回成功；其他情况返回 401
-app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if ((username === 'super' && password === '123') || password === '123') {
-    return res.json({ ...MOCK_USER, username });
-  }
-  return res.status(401).json({ error: 'invalid credentials' });
-});
-
-// 群组接口（仅返回一个示例组）
-app.get('/api/groups', (_req, res) => {
-  res.json([{ id: 'g1', name: 'General' }]);
-});
-
-// ---- Socket.IO (Phase 1 占位) ---- //
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: 'http://localhost:4200', methods: ['GET', 'POST'] }
+const io = socketIo(server, {
+  cors: {
+    origin: "http://localhost:4200",
+    methods: ["GET", "POST"]
+  }
 });
 
-// 监听客户端连接
-io.on('connection', (socket) => {
-  console.log('socket connected:', socket.id);
+const PORT = process.env.PORT || 3000;
 
-  // 监听前端发送的消息事件，并广播给所有客户端
-  socket.on('newmsg', (msg) => {
-    console.log('recv:', msg);
-    io.emit('newmsg', msg); // 广播给所有客户端
+app.use(cors({
+  origin: "http://localhost:4200",
+  credentials: true
+}));
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use('/api/auth', authRoutes);
+app.use('/api/groups', authenticateToken, groupRoutes);
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Chat server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+const activeUsers = new Map();
+const roomUsers = new Map();
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  socket.on('user-join', (userData) => {
+    activeUsers.set(socket.id, userData);
+    console.log(\`User \${userData.username} joined\`);
   });
 
-  socket.on('disconnect', () => console.log('socket disconnected:', socket.id));
+  socket.on('join-channel', (data) => {
+    const { channelId, user } = data;
+    socket.join(channelId);
+
+    if (!roomUsers.has(channelId)) {
+      roomUsers.set(channelId, new Set());
+    }
+    roomUsers.get(channelId).add(user.username);
+
+    socket.to(channelId).emit('user-joined-channel', {
+      username: user.username,
+      message: \`\${user.username} 加入了频道\`
+    });
+
+    console.log(\`User \${user.username} joined channel \${channelId}\`);
+  });
+
+  socket.on('leave-channel', (data) => {
+    const { channelId, user } = data;
+    socket.leave(channelId);
+
+    if (roomUsers.has(channelId)) {
+      roomUsers.get(channelId).delete(user.username);
+      if (roomUsers.get(channelId).size === 0) {
+        roomUsers.delete(channelId);
+      }
+    }
+
+    socket.to(channelId).emit('user-left-channel', {
+      username: user.username,
+      message: \`\${user.username} 离开了频道\`
+    });
+  });
+
+  socket.on('send-message', (data) => {
+    const { channelId, message, user, timestamp } = data;
+
+    const messageData = {
+      id: Date.now().toString(),
+      content: message,
+      senderId: user.id,
+      senderUsername: user.username,
+      channelId: channelId,
+      timestamp: timestamp || new Date(),
+      type: 'text'
+    };
+
+    io.to(channelId).emit('receive-message', messageData);
+    console.log(\`Message sent to channel \${channelId} by \${user.username}\`);
+  });
+
+  socket.on('typing-start', (data) => {
+    socket.to(data.channelId).emit('user-typing', {
+      username: data.username,
+      isTyping: true
+    });
+  });
+
+  socket.on('typing-stop', (data) => {
+    socket.to(data.channelId).emit('user-typing', {
+      username: data.username,
+      isTyping: false
+    });
+  });
+
+  socket.on('disconnect', () => {
+    const userData = activeUsers.get(socket.id);
+    if (userData) {
+      console.log(\`User \${userData.username} disconnected\`);
+      activeUsers.delete(socket.id);
+
+      roomUsers.forEach((users, channelId) => {
+        if (users.has(userData.username)) {
+          users.delete(userData.username);
+          socket.to(channelId).emit('user-left-channel', {
+            username: userData.username,
+            message: \`\${userData.username} 离开了频道\`
+          });
+        }
+      });
+    }
+    console.log('User disconnected:', socket.id);
+  });
 });
 
-// 启动服务器
-const PORT = 3000;
 server.listen(PORT, () => {
-  console.log(`Phase1 server listening on http://localhost:${PORT}`);
+  console.log(\`Chat server is running on port \${PORT}\`);
+  console.log(\`Socket.IO server is ready\`);
 });
