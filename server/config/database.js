@@ -8,7 +8,7 @@ class Database {
 
   async connect() {
     try {
-      const mongoUri = process.env.MONGODB_URI || 'mongodb://admin:chatpassword@localhost:27017/chatdb?authSource=admin';
+      const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/chatdb';
 
       const options = {
         maxPoolSize: 10, // 最大连接池大小
