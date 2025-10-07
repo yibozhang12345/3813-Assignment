@@ -1,17 +1,24 @@
 const express = require('express');
+// 引入multer中间件用于文件上传
+// Import multer middleware for file uploads
 const multer = require('multer');
-const path = require('path');
+// 引入path模块用于路径操作
+// Import path module for path operations
 const fs = require('fs');
+// 引入uuid模块用于生成唯一标识符
+// Import uuid module for generating unique identifiers
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
 // Configure file storage
+// 配置文件存储
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     let uploadPath = './uploads/files';
 
     // Select different storage directories based on file type
+    // 根据文件类型选择不同的存储目录
     if (file.fieldname === 'avatar') {
       uploadPath = './uploads/avatars';
     } else if (file.mimetype.startsWith('image/')) {
@@ -19,6 +26,7 @@ const storage = multer.diskStorage({
     }
 
     // Ensure directory exists
+    // 确保目录存在
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -27,6 +35,7 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     // Generate unique filename
+    // 生成唯一文件名
     const uniqueSuffix = uuidv4();
     const ext = path.extname(file.originalname);
     const name = path.basename(file.originalname, ext);
@@ -35,15 +44,19 @@ const storage = multer.diskStorage({
 });
 
 // File filter
+// 文件过滤器
 const fileFilter = (req, file, cb) => {
   // Allowed file types
+  // 允许的文件类型
   const allowedTypes = {
     avatar: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'],
     image: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
     file: [
       // Images
+      // 图片
       'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
       // Documents
+      // 文档
       'application/pdf', 'text/plain', 'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel',
@@ -51,8 +64,10 @@ const fileFilter = (req, file, cb) => {
       'application/vnd.ms-powerpoint',
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       // Archives
+      // 压缩文件
       'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
       // Other
+      // 其他
       'application/json', 'text/csv'
     ]
   };
@@ -68,18 +83,23 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Configure multer
+// 配置multer
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // Default 10MB
+    // 默认10MB
     files: 5 // Maximum 5 files
+    // 最多5个文件
   }
 });
 
 /**
  * Upload avatar
  * Handles avatar image upload for user profiles.
+ * 上传头像
+ * 处理用户头像图片上传。
  */
 router.post('/avatar', upload.single('avatar'), (req, res) => {
   try {
@@ -116,6 +136,8 @@ router.post('/avatar', upload.single('avatar'), (req, res) => {
 /**
  * Upload chat image
  * Handles image upload for chat messages.
+ * 上传聊天图片
+ * 处理聊天消息的图片上传。
  */
 router.post('/image', upload.single('image'), (req, res) => {
   try {
@@ -154,6 +176,8 @@ router.post('/image', upload.single('image'), (req, res) => {
 /**
  * Upload single file
  * Handles general file upload with automatic directory selection.
+ * 上传单个文件
+ * 处理通用文件上传，自动选择目录。
  */
 router.post('/file', upload.single('file'), (req, res) => {
   try {
@@ -195,6 +219,8 @@ router.post('/file', upload.single('file'), (req, res) => {
 /**
  * Upload multiple files
  * Handles multiple file uploads with automatic directory selection.
+ * 上传多个文件
+ * 处理多个文件上传，自动选择目录。
  */
 router.post('/files', upload.array('files', 5), (req, res) => {
   try {
@@ -238,6 +264,8 @@ router.post('/files', upload.array('files', 5), (req, res) => {
 /**
  * Delete file
  * Removes a file from the server with security checks.
+ * 删除文件
+ * 从服务器删除文件，包含安全检查。
  */
 router.delete('/file/:filename', (req, res) => {
   try {
@@ -290,6 +318,8 @@ router.delete('/file/:filename', (req, res) => {
 /**
  * Get file information
  * Returns metadata about a specific file.
+ * 获取文件信息
+ * 返回特定文件的元数据。
  */
 router.get('/file/:filename', (req, res) => {
   try {
@@ -347,6 +377,7 @@ router.get('/file/:filename', (req, res) => {
 });
 
 // Error handling middleware
+// 错误处理中间件
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
@@ -370,3 +401,5 @@ router.use((error, req, res, next) => {
 });
 
 module.exports = router;
+// 导出路由模块
+// Export router module

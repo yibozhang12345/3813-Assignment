@@ -1,47 +1,55 @@
+// 加载环境变量配置
 require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+
+// 导入必要的Node.js模块
+const express = require('express'); // Express框架，用于构建Web服务器
+const http = require('http'); // HTTP模块，用于创建HTTP服务器
+const socketIo = require('socket.io'); // Socket.IO，用于实时通信
+const cors = require('cors'); // CORS中间件，处理跨域请求
+const path = require('path'); // 路径模块，处理文件路径
+const fs = require('fs'); // 文件系统模块，处理文件操作
 
 // Import configuration and models
-const database = require('./config/database');
-const mongoDataStore = require('./models/mongoDataStore');
+const database = require('./config/database'); // 数据库配置模块
+const mongoDataStore = require('./models/mongoDataStore'); // MongoDB数据存储操作模块
 
 // Import routes
-const authRoutes = require('./routes/auth');
-const groupRoutes = require('./routes/groups');
-const uploadRoutes = require('./routes/upload');
-const adminRoutes = require('./routes/admin');
-const profileRoutes = require('./routes/profile');
+const authRoutes = require('./routes/auth'); // 用户认证路由模块
+const groupRoutes = require('./routes/groups'); // 群组管理路由模块
+const uploadRoutes = require('./routes/upload'); // 文件上传路由模块
+const adminRoutes = require('./routes/admin'); // 管理员功能路由模块
+const profileRoutes = require('./routes/profile'); // 用户资料路由模块
 
 // Import middleware
-const { authenticateToken } = require('./middleware/auth');
+const { authenticateToken } = require('./middleware/auth'); // JWT认证中间件
 
+// 创建Express应用实例
 const app = express();
+// 创建HTTP服务器实例
 const server = http.createServer(app);
+// 配置Socket.IO服务器，支持跨域访问
 const io = socketIo(server, {
   cors: {
-    origin: [process.env.CLIENT_URL || "http://localhost:4200", "http://localhost:4201"],
-    methods: ["GET", "POST"],
-    credentials: true
+    origin: [process.env.CLIENT_URL || "http://localhost:4200", "http://localhost:4201"], // 允许的客户端URL列表
+    methods: ["GET", "POST"], // 允许的HTTP方法
+    credentials: true // 允许发送凭据（如cookies）
   }
 });
 
+// 设置服务器监听端口，默认3000
 const PORT = process.env.PORT || 3000;
 
-// Middleware configuration
+// 中间件配置
 app.use(cors({
-  origin: [process.env.CLIENT_URL || "http://localhost:4200", "http://localhost:4201"],
-  credentials: true
+  origin: [process.env.CLIENT_URL || "http://localhost:4200", "http://localhost:4201"], // 允许的客户端URL列表
+  credentials: true // 允许发送凭据（如cookies）
 }));
 
+// 配置Express中间件，解析JSON和URL编码的数据，设置大小限制为50MB
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Create upload directories if they do not exist
+// 如果不存在则创建上传目录
 const uploadDir = process.env.UPLOAD_PATH || './uploads';
 const avatarDir = path.join(uploadDir, 'avatars');
 const filesDir = path.join(uploadDir, 'files');
@@ -52,11 +60,11 @@ const filesDir = path.join(uploadDir, 'files');
   }
 });
 
-// Static file serving
+// 静态文件服务
 app.use('/uploads', express.static(uploadDir));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// API routes
+// API路由配置
 app.use('/api/auth', authRoutes);
 app.use('/api/groups', authenticateToken, groupRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
@@ -64,8 +72,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/profile', profileRoutes);
 
 /**
- * Health check endpoint for the server.
- * Returns the status of the server, database, and data store.
+ * 服务器健康检查端点
+ * 返回服务器、数据库和数据存储的状态
  */
 app.get('/api/health', async (req, res) => {
   try {
@@ -90,21 +98,21 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Socket.io connection management
-const activeUsers = new Map(); // socketId -> userData
-const userSockets = new Map(); // userId -> socketId
-const channelUsers = new Map(); // channelId -> Set of userIds
-const typingUsers = new Map(); // channelId -> Set of userIds
+// Socket.io连接管理
+const activeUsers = new Map(); // socketId -> userData，存储活跃用户的映射
+const userSockets = new Map(); // userId -> socketId，用户ID到socket ID的映射
+const channelUsers = new Map(); // channelId -> Set of userIds，频道中的用户集合
+const typingUsers = new Map(); // channelId -> Set of userIds，正在输入的用户集合
 
 /**
- * Handles all socket.io events for real-time chat functionality.
+ * 处理所有socket.io事件，实现实时聊天功能
  */
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
 
   /**
-   * Handles user joining the chat system.
-   * @param {Object} userData - The user data object.
+   * 处理用户加入聊天系统的事件
+   * @param {Object} userData - 用户数据对象
    */
   socket.on('user-join', async (userData) => {
     try {
@@ -128,8 +136,8 @@ io.on('connection', (socket) => {
   });
 
     /**
-     * Handles user joining a channel.
-     * @param {Object} data - Contains channelId and user object.
+     * 处理用户加入频道的事件
+     * @param {Object} data - 包含channelId和user对象的参数
      */
     socket.on('join-channel', async (data) => {
       try {
@@ -187,8 +195,8 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * Handles user leaving a channel.
-     * @param {Object} data - Contains channelId and user object.
+     * 处理用户离开频道的事件
+     * @param {Object} data - 包含channelId和user对象的参数
      */
     socket.on('leave-channel', (data) => {
       const { channelId, user } = data;
@@ -219,8 +227,8 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * Handles sending a message to a channel.
-     * @param {Object} data - Contains channelId, message, user, and file info.
+     * 处理向频道发送消息的事件
+     * @param {Object} data - 包含channelId、message、user和文件信息的参数
      */
     socket.on('send-message', async (data) => {
       try {
@@ -307,8 +315,8 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * Handles typing start event in a channel.
-     * @param {Object} data - Contains channelId and user object.
+     * 处理频道中开始输入的事件
+     * @param {Object} data - 包含channelId和user对象的参数
      */
     socket.on('typing-start', (data) => {
       const { channelId, user } = data;
@@ -325,8 +333,8 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * Handles typing stop event in a channel.
-     * @param {Object} data - Contains channelId and user object.
+     * 处理频道中停止输入的事件
+     * @param {Object} data - 包含channelId和user对象的参数
      */
     socket.on('typing-stop', (data) => {
       const { channelId, user } = data;
@@ -342,8 +350,8 @@ io.on('connection', (socket) => {
     });
 
     /**
-     * Handles user disconnect event.
-     * Cleans up user state and broadcasts offline status.
+     * 处理用户断开连接的事件
+     * 清理用户状态并广播离线状态
      */
     socket.on('disconnect', async () => {
       try {
@@ -392,7 +400,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start the server
+// 启动服务器
 server.listen(PORT, async () => {
   console.log(`🚀 Chat server (phase 2) started`);
   console.log(`📡 Port: ${PORT}`);
@@ -401,7 +409,7 @@ server.listen(PORT, async () => {
   console.log(`📊 Admin panel: http://localhost:8081 (MongoDB Express)`);
   console.log(`⚡ Socket.IO server is ready`);
 
-  // Wait for database connection and then initialize data
+  // 等待数据库连接，然后初始化数据
   setTimeout(async () => {
     try {
       const health = await mongoDataStore.healthCheck();

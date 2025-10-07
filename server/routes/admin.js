@@ -7,6 +7,8 @@ const router = express.Router();
 /**
  * Get all users (super admin only)
  * Returns a list of all users in the system.
+ * 获取所有用户（仅超级管理员）
+ * 返回系统中所有用户的列表。
  */
 router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
@@ -25,6 +27,8 @@ router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
 /**
  * Get all groups (super admin only)
  * Returns a list of all groups in the system.
+ * 获取所有群组（仅超级管理员）
+ * 返回系统中所有群组的列表。
  */
 router.get('/groups', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
@@ -43,12 +47,15 @@ router.get('/groups', authenticateToken, requireSuperAdmin, async (req, res) => 
 /**
  * Delete a user (super admin only)
  * Prevents deleting your own account.
+ * 删除用户（仅超级管理员）
+ * 防止删除自己的账户。
  */
 router.delete('/users/:userId', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
 
     // Prevent deleting your own super admin account
+    // 防止删除自己的超级管理员账户
     if (req.user.id === userId) {
       return res.status(400).json({
         success: false,
@@ -82,6 +89,8 @@ router.delete('/users/:userId', authenticateToken, requireSuperAdmin, async (req
 /**
  * Update user roles (super admin only)
  * Prevents removing your own super admin role.
+ * 更新用户角色（仅超级管理员）
+ * 防止移除自己的超级管理员角色。
  */
 router.put('/users/:userId/roles', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
@@ -96,6 +105,7 @@ router.put('/users/:userId/roles', authenticateToken, requireSuperAdmin, async (
     }
 
     // Validate roles
+    // 验证角色
     const validRoles = ['user', 'group-admin', 'super-admin'];
     const invalidRoles = roles.filter(role => !validRoles.includes(role));
 
@@ -107,6 +117,7 @@ router.put('/users/:userId/roles', authenticateToken, requireSuperAdmin, async (
     }
 
     // Prevent removing your own super admin role
+    // 防止移除自己的超级管理员角色
     if (req.user.id === userId && !roles.includes('super-admin')) {
       return res.status(400).json({
         success: false,

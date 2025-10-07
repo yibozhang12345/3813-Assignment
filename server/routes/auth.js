@@ -8,6 +8,8 @@ const router = express.Router();
 /**
  * User login endpoint
  * Validates username and password, returns JWT token on success.
+ * 用户登录端点
+ * 验证用户名和密码，成功时返回JWT令牌。
  */
 router.post('/login', async (req, res) => {
   try {
@@ -72,6 +74,8 @@ router.post('/login', async (req, res) => {
 /**
  * User registration endpoint
  * Registers a new user with username, email, and password.
+ * 用户注册端点
+ * 使用用户名、邮箱和密码注册新用户。
  */
 router.post('/register', async (req, res) => {
   try {
@@ -125,6 +129,8 @@ router.post('/register', async (req, res) => {
 /**
  * Get all users
  * Returns a list of all users (public endpoint).
+ * 获取所有用户
+ * 返回所有用户的列表（公共端点）。
  */
 router.get('/users', async (req, res) => {
   try {
@@ -155,6 +161,8 @@ router.get('/users', async (req, res) => {
 /**
  * Promote user to group-admin or super-admin
  * Adds a role to the user if not already present.
+ * 将用户提升为群组管理员或超级管理员
+ * 如果用户尚未拥有该角色，则添加该角色。
  */
 router.put('/users/:id/promote', async (req, res) => {
   try {
@@ -177,6 +185,7 @@ router.put('/users/:id/promote', async (req, res) => {
     }
 
     // Ensure user.roles exists and is an array
+    // 确保user.roles存在且为数组
     if (!user.roles || !Array.isArray(user.roles)) {
       user.roles = ['user'];
     }
@@ -203,6 +212,8 @@ router.put('/users/:id/promote', async (req, res) => {
 /**
  * Demote user from group-admin or super-admin
  * Removes a role from the user, always keeps at least 'user' role.
+ * 将用户从群组管理员或超级管理员降级
+ * 从用户中移除角色，始终保留至少'user'角色。
  */
 router.put('/users/:id/demote', async (req, res) => {
   try {
@@ -225,14 +236,17 @@ router.put('/users/:id/demote', async (req, res) => {
     }
 
     // Ensure user.roles exists and is an array
+    // 确保user.roles存在且为数组
     if (!user.roles || !Array.isArray(user.roles)) {
       user.roles = ['user'];
     }
 
     // Remove the specified role from the list
+    // 从列表中移除指定的角色
     if (user.roles.includes(role)) {
       user.roles = user.roles.filter(r => r !== role);
       // Always keep at least 'user' role
+      // 始终保留至少'user'角色
       if (!user.roles.includes('user')) {
         user.roles.push('user');
       }
@@ -256,6 +270,8 @@ router.put('/users/:id/demote', async (req, res) => {
 /**
  * Delete a user (requires authentication)
  * Prevents deleting your own account.
+ * 删除用户（需要认证）
+ * 防止删除自己的账户。
  */
 router.delete('/users/:id', require('../middleware/auth').authenticateToken, async (req, res) => {
   try {
@@ -294,12 +310,15 @@ router.delete('/users/:id', require('../middleware/auth').authenticateToken, asy
 /**
  * Admin create user endpoint
  * Only super-admin and group-admin can create users.
+ * 管理员创建用户端点
+ * 只有超级管理员和群组管理员可以创建用户。
  */
 router.post('/admin/create-user', require('../middleware/auth').authenticateToken, async (req, res) => {
   try {
     const { username, email, password, roles = ['user'] } = req.body;
 
     // Permission check: only super-admin and group-admin can create users
+    // 权限检查：只有超级管理员和群组管理员可以创建用户
     if (!req.user.roles.includes('super-admin') && !req.user.roles.includes('group-admin')) {
       return res.status(403).json({
         success: false,
@@ -315,6 +334,7 @@ router.post('/admin/create-user', require('../middleware/auth').authenticateToke
     }
 
     // Check username length
+    // 检查用户名长度
     if (username.length < 3 || username.length > 20) {
       return res.status(400).json({
         success: false,
@@ -323,6 +343,7 @@ router.post('/admin/create-user', require('../middleware/auth').authenticateToke
     }
 
     // Check password length
+    // 检查密码长度
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
@@ -331,6 +352,7 @@ router.post('/admin/create-user', require('../middleware/auth').authenticateToke
     }
 
     // Hash password
+    // 哈希密码
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await dataStore.createUserByAdmin({

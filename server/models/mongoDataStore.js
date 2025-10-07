@@ -5,15 +5,21 @@ const Message = require('./mongodb/Message');
 const GroupApplication = require('./mongodb/GroupApplication');
 const mongoose = require('mongoose');
 
+// MongoDB数据存储类
+// 提供对用户、群组、频道、消息等数据的管理操作
 class MongoDataStore {
+  // 构造函数：在初始化时确保默认超级管理员存在
   constructor() {
     // Ensure default super admin exists during initialization
+    // 初始化时确保默认超级管理员存在
     this.initializeDefaultUser();
   }
 
   /**
    * Initialize default user
    * Creates a default super admin user if it doesn't exist.
+   * 初始化默认用户
+   * 如果不存在，则创建一个默认的超级管理员用户。
    */
   async initializeDefaultUser() {
     try {
@@ -34,10 +40,13 @@ class MongoDataStore {
   }
 
   // User management methods
+  // 用户管理方法
 
   /**
    * Get all users
    * Returns a list of all users without passwords.
+   * 获取所有用户
+   * 返回所有用户列表，不包含密码。
    */
   async getUsers() {
     try {
@@ -52,6 +61,9 @@ class MongoDataStore {
    * Add new user
    * Creates a new user with the provided data.
    * @param {Object} userData - User data to create
+   * 添加新用户
+   * 使用提供的数据创建新用户。
+   * @param {Object} userData - 要创建的用户数据
    */
   async addUser(userData) {
     try {
@@ -66,6 +78,8 @@ class MongoDataStore {
   /**
    * Find user by username
    * @param {string} username - Username to search for
+   * 根据用户名查找用户
+   * @param {string} username - 要搜索的用户名
    */
   async findUserByUsername(username) {
     try {
@@ -79,6 +93,8 @@ class MongoDataStore {
   /**
    * Find user by ID
    * @param {string} id - User ID to search for
+   * 根据ID查找用户
+   * @param {string} id - 要搜索的用户ID
    */
   async findUserById(id) {
     try {
@@ -94,6 +110,10 @@ class MongoDataStore {
    * Updates user information and sets updated timestamp.
    * @param {string} userId - User ID to update
    * @param {Object} updates - Fields to update
+   * 更新用户
+   * 更新用户信息并设置更新时间戳。
+   * @param {string} userId - 要更新的用户ID
+   * @param {Object} updates - 要更新的字段
    */
   async updateUser(userId, updates) {
     try {
@@ -112,12 +132,16 @@ class MongoDataStore {
    * Delete user
    * Removes a user and cleans up all related data.
    * @param {string} userId - User ID to delete
+   * 删除用户
+   * 移除用户并清理所有相关数据。
+   * @param {string} userId - 要删除的用户ID
    */
   async deleteUser(userId) {
     try {
       const result = await User.findByIdAndDelete(userId);
       if (result) {
         // Remove user from all groups
+        // 从所有群组中移除用户
         await Group.updateMany(
           {},
           {
@@ -129,12 +153,14 @@ class MongoDataStore {
         );
 
         // Remove user from all channels
+        // 从所有频道中移除用户
         await Channel.updateMany(
           {},
           { $pull: { memberIds: userId } }
         );
 
         // Delete all group applications for this user
+        // 删除此用户的所有群组申请
         await GroupApplication.deleteMany({ userId: userId });
 
         return true;
@@ -147,10 +173,13 @@ class MongoDataStore {
   }
 
   // Group management methods
+  // 群组管理方法
 
   /**
    * Get all groups
    * Returns all groups with populated admin and member information.
+   * 获取所有群组
+   * 返回所有群组，并填充管理员和成员信息。
    */
   async getGroups() {
     try {
@@ -168,6 +197,9 @@ class MongoDataStore {
    * Get user's groups
    * Returns all groups where the user is a member or admin.
    * @param {string} userId - User ID
+   * 获取用户的群组
+   * 返回用户作为成员或管理员的所有群组。
+   * @param {string} userId - 用户ID
    */
   async getUserGroups(userId) {
     try {
@@ -182,12 +214,16 @@ class MongoDataStore {
    * Add new group
    * Creates a new group and automatically adds creator as admin and member.
    * @param {Object} groupData - Group data to create
+   * 添加新群组
+   * 创建新群组，并自动将创建者添加为管理员和成员。
+   * @param {Object} groupData - 要创建的群组数据
    */
   async addGroup(groupData) {
     try {
       const group = new Group(groupData);
 
       // Creator automatically becomes admin and member
+      // 创建者自动成为管理员和成员
       if (!group.adminIds.includes(groupData.createdBy)) {
         group.adminIds.push(groupData.createdBy);
       }
@@ -198,6 +234,7 @@ class MongoDataStore {
       const savedGroup = await group.save();
 
       // Create default 'general' channel
+      // 创建默认的'general'频道
       const defaultChannel = new Channel({
         name: 'general',
         description: 'Default channel',
@@ -220,6 +257,8 @@ class MongoDataStore {
   /**
    * Find group by ID
    * @param {string} id - Group ID to search for
+   * 根据ID查找群组
+   * @param {string} id - 要搜索的群组ID
    */
   async findGroupById(id) {
     try {
@@ -237,6 +276,10 @@ class MongoDataStore {
    * Updates group information and sets updated timestamp.
    * @param {string} groupId - Group ID to update
    * @param {Object} updates - Fields to update
+   * 更新群组
+   * 更新群组信息并设置更新时间戳。
+   * @param {string} groupId - 要更新的群组ID
+   * @param {Object} updates - 要更新的字段
    */
   async updateGroup(groupId, updates) {
     try {
@@ -255,27 +298,36 @@ class MongoDataStore {
    * Delete group
    * Removes a group and all associated channels and messages.
    * @param {string} groupId - Group ID to delete
+   * 删除群组
+   * 移除群组及其所有关联的频道和消息。
+   * @param {string} groupId - 要删除的群组ID
    */
   async deleteGroup(groupId) {
     try {
       // Get group information
+      // 获取群组信息
       const group = await Group.findById(groupId);
       if (!group) return false;
 
       // Delete all channels and related messages in the group
+      // 删除群组中的所有频道及相关消息
       const channels = await Channel.find({ groupId: groupId });
       for (const channel of channels) {
         // Delete all messages in the channel
+        // 删除频道中的所有消息
         await Message.deleteMany({ channelId: channel._id });
       }
 
       // Delete all channels
+      // 删除所有频道
       await Channel.deleteMany({ groupId: groupId });
 
       // Delete group application records
+      // 删除群组申请记录
       await GroupApplication.deleteMany({ groupId: groupId });
 
       // Delete group
+      // 删除群组
       const result = await Group.findByIdAndDelete(groupId);
 
       return !!result;
@@ -290,6 +342,10 @@ class MongoDataStore {
    * Adds a user as a member to a group and all its channels.
    * @param {string} groupId - Group ID
    * @param {string} userId - User ID to add
+   * 将用户添加到群组
+   * 将用户作为成员添加到群组及其所有频道。
+   * @param {string} groupId - 群组ID
+   * @param {string} userId - 要添加的用户ID
    */
   async addUserToGroup(groupId, userId) {
     try {
@@ -299,6 +355,7 @@ class MongoDataStore {
       const success = await group.addMember(userId);
 
       // Add user to all channels in the group
+      // 将用户添加到群组的所有频道
       await Channel.updateMany(
         { groupId: groupId },
         { $addToSet: { memberIds: userId } }
@@ -316,6 +373,10 @@ class MongoDataStore {
    * Removes a user from a group and all its channels.
    * @param {string} groupId - Group ID
    * @param {string} userId - User ID to remove
+   * 从群组中移除用户
+   * 从群组及其所有频道中移除用户。
+   * @param {string} groupId - 群组ID
+   * @param {string} userId - 要移除的用户ID
    */
   async removeUserFromGroup(groupId, userId) {
     try {
@@ -325,6 +386,7 @@ class MongoDataStore {
       const success = await group.removeMember(userId);
 
       // Remove user from all channels in the group
+      // 从群组的所有频道中移除用户
       await Channel.updateMany(
         { groupId: groupId },
         { $pull: { memberIds: userId } }
@@ -342,6 +404,10 @@ class MongoDataStore {
    * Grants admin privileges to a user in a group.
    * @param {string} groupId - Group ID
    * @param {string} userId - User ID to promote
+   * 将用户提升为群组管理员
+   * 授予用户在群组中的管理员权限。
+   * @param {string} groupId - 群组ID
+   * @param {string} userId - 要提升的用户ID
    */
   async promoteUserToGroupAdmin(groupId, userId) {
     try {
@@ -349,16 +415,19 @@ class MongoDataStore {
       if (!group) return false;
 
       // Check if user is already an admin
+      // 检查用户是否已经是管理员
       if (group.adminIds.includes(userId)) {
         return false;
       }
 
       // Check if user is a member
+      // 检查用户是否是成员
       if (!group.memberIds.includes(userId)) {
         return false;
       }
 
       // Add user to admin list
+      // 将用户添加到管理员列表
       group.adminIds.push(userId);
       await group.save();
 
@@ -374,6 +443,10 @@ class MongoDataStore {
    * Removes admin privileges from a user in a group.
    * @param {string} groupId - Group ID
    * @param {string} userId - User ID to demote
+   * 将用户从群组管理员降级
+   * 移除用户在群组中的管理员权限。
+   * @param {string} groupId - 群组ID
+   * @param {string} userId - 要降级的用户ID
    */
   async demoteUserFromGroupAdmin(groupId, userId) {
     try {
@@ -381,11 +454,13 @@ class MongoDataStore {
       if (!group) return false;
 
       // Check if user is an admin
+      // 检查用户是否是管理员
       if (!group.adminIds.includes(userId)) {
         return false;
       }
 
       // Remove user from admin list (user remains a member)
+      // 从管理员列表中移除用户（用户仍为成员）
       group.adminIds = group.adminIds.filter(adminId => adminId.toString() !== userId.toString());
       await group.save();
 
@@ -397,11 +472,15 @@ class MongoDataStore {
   }
 
   // Channel management methods
+  // 频道管理方法
 
   /**
    * Get group channels
    * Returns all channels for a specific group.
    * @param {string} groupId - Group ID
+   * 获取群组频道
+   * 返回特定群组的所有频道。
+   * @param {string} groupId - 群组ID
    */
   async getGroupChannels(groupId) {
     try {
@@ -417,10 +496,15 @@ class MongoDataStore {
    * Creates a new channel within a group.
    * @param {string} groupId - Group ID
    * @param {Object} channelData - Channel data to create
+   * 向群组添加频道
+   * 在群组中创建新频道。
+   * @param {string} groupId - 群组ID
+   * @param {Object} channelData - 要创建的频道数据
    */
   async addChannelToGroup(groupId, channelData) {
     try {
       // Get group member list
+      // 获取群组成员列表
       const group = await Group.findById(groupId);
       if (!group) return null;
 
@@ -440,6 +524,8 @@ class MongoDataStore {
   /**
    * Find channel by ID
    * @param {string} channelId - Channel ID to search for
+   * 根据ID查找频道
+   * @param {string} channelId - 要搜索的频道ID
    */
   async findChannelById(channelId) {
     try {
@@ -456,13 +542,18 @@ class MongoDataStore {
    * Delete channel
    * Removes a channel and all its messages.
    * @param {string} channelId - Channel ID to delete
+   * 删除频道
+   * 移除频道及其所有消息。
+   * @param {string} channelId - 要删除的频道ID
    */
   async deleteChannel(channelId) {
     try {
       // Delete all messages in the channel
+      // 删除频道中的所有消息
       await Message.deleteMany({ channelId: channelId });
 
       // Delete channel
+      // 删除频道
       const result = await Channel.findByIdAndDelete(channelId);
 
       return !!result;
@@ -473,17 +564,23 @@ class MongoDataStore {
   }
 
   // Message management methods
+  // 消息管理方法
 
   /**
    * Get channel messages
    * Returns messages for a specific channel with pagination options.
    * @param {string} channelId - Channel ID
    * @param {Object} options - Pagination and filtering options
+   * 获取频道消息
+   * 返回特定频道的消息，支持分页选项。
+   * @param {string} channelId - 频道ID
+   * @param {Object} options - 分页和过滤选项
    */
   async getChannelMessages(channelId, options = {}) {
     try {
       const messages = await Message.getChannelMessages(channelId, options);
       return messages.reverse(); // Return in chronological order
+      // 返回按时间顺序排列的消息
     } catch (error) {
       console.error('Failed to get channel messages:', error);
       throw error;
@@ -494,6 +591,9 @@ class MongoDataStore {
    * Add message
    * Creates a new message and updates channel activity.
    * @param {Object} messageData - Message data to create
+   * 添加消息
+   * 创建新消息并更新频道活动时间。
+   * @param {Object} messageData - 要创建的消息数据
    */
   async addMessage(messageData) {
     try {
@@ -501,6 +601,7 @@ class MongoDataStore {
       const savedMessage = await message.save();
 
       // Update channel's last activity time
+      // 更新频道的最后活动时间
       await Channel.findByIdAndUpdate(
         messageData.channelId,
         { lastActivity: new Date() }
@@ -519,6 +620,10 @@ class MongoDataStore {
    * Edits the content of an existing message.
    * @param {string} messageId - Message ID to update
    * @param {string} content - New message content
+   * 更新消息
+   * 编辑现有消息的内容。
+   * @param {string} messageId - 要更新的消息ID
+   * @param {string} content - 新的消息内容
    */
   async updateMessage(messageId, content) {
     try {
@@ -536,6 +641,9 @@ class MongoDataStore {
    * Delete message
    * Removes a message from the database.
    * @param {string} messageId - Message ID to delete
+   * 删除消息
+   * 从数据库中移除消息。
+   * @param {string} messageId - 要删除的消息ID
    */
   async deleteMessage(messageId) {
     try {
@@ -547,12 +655,17 @@ class MongoDataStore {
   }
 
   // User online status management
+  // 用户在线状态管理
 
   /**
    * Set user online status
    * Updates a user's online status and last seen time.
    * @param {string} userId - User ID
    * @param {boolean} isOnline - Online status
+   * 设置用户在线状态
+   * 更新用户的在线状态和最后在线时间。
+   * @param {string} userId - 用户ID
+   * @param {boolean} isOnline - 在线状态
    */
   async setUserOnline(userId, isOnline = true) {
     try {
@@ -573,6 +686,8 @@ class MongoDataStore {
   /**
    * Get online users
    * Returns all users who are currently online.
+   * 获取在线用户
+   * 返回当前所有在线的用户。
    */
   async getOnlineUsers() {
     try {
@@ -586,6 +701,8 @@ class MongoDataStore {
   /**
    * Health check
    * Performs a health check on the database and returns statistics.
+   * 健康检查
+   * 对数据库执行健康检查并返回统计信息。
    */
   async healthCheck() {
     try {
@@ -612,15 +729,20 @@ class MongoDataStore {
   }
 
   // Group application management methods
+  // 群组申请管理方法
 
   /**
    * Get available groups for application
    * Returns groups that a user has not joined and can apply to.
    * @param {string} userId - User ID
+   * 获取可申请的群组
+   * 返回用户尚未加入且可以申请的群组。
+   * @param {string} userId - 用户ID
    */
   async getAvailableGroups(userId) {
     try {
       // Get groups the user has not joined
+      // 获取用户尚未加入的群组
       const groups = await Group.find({
         $and: [
           { memberIds: { $ne: userId } },
@@ -629,11 +751,13 @@ class MongoDataStore {
       }).populate('adminIds memberIds', 'username email avatar');
 
       // Get channel count for each group
+      // 获取每个群组的频道数量
       const GroupsWithChannelCount = await Promise.all(
         groups.map(async (group) => {
           const channelCount = await Channel.countDocuments({ groupId: group._id });
           const groupObj = group.toObject();
           groupObj.channels = [{ id: 'general', name: 'general' }]; // Simulate default channel
+          // 模拟默认频道
           return groupObj;
         })
       );
@@ -649,6 +773,9 @@ class MongoDataStore {
    * Create group application
    * Submits an application for a user to join a group.
    * @param {Object} applicationData - Application data
+   * 创建群组申请
+   * 提交用户加入群组的申请。
+   * @param {Object} applicationData - 申请数据
    */
   async createGroupApplication(applicationData) {
     try {
@@ -674,6 +801,9 @@ class MongoDataStore {
    * Get pending applications
    * Returns pending applications for a specific group or all groups.
    * @param {string} groupId - Optional group ID filter
+   * 获取待处理申请
+   * 返回特定群组或所有群组的待处理申请。
+   * @param {string} groupId - 可选的群组ID过滤器
    */
   async getPendingApplications(groupId = null) {
     try {
@@ -693,6 +823,10 @@ class MongoDataStore {
    * Approves or rejects a group join application.
    * @param {string} applicationId - Application ID
    * @param {Object} reviewData - Review data with action and message
+   * 审核群组申请
+   * 批准或拒绝群组加入申请。
+   * @param {string} applicationId - 申请ID
+   * @param {Object} reviewData - 审核数据，包含操作和消息
    */
   async reviewGroupApplication(applicationId, reviewData) {
     try {
@@ -727,6 +861,9 @@ class MongoDataStore {
    * Get user applications
    * Returns all applications submitted by a specific user.
    * @param {string} userId - User ID
+   * 获取用户申请
+   * 返回特定用户提交的所有申请。
+   * @param {string} userId - 用户ID
    */
   async getUserApplications(userId) {
     try {
@@ -741,6 +878,9 @@ class MongoDataStore {
    * Create user by admin
    * Allows administrators to create new users.
    * @param {Object} userData - User data to create
+   * 管理员创建用户
+   * 允许管理员创建新用户。
+   * @param {Object} userData - 要创建的用户数据
    */
   async createUserByAdmin(userData) {
     try {

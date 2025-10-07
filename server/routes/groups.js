@@ -1,4 +1,6 @@
 const express = require('express');
+// 引入数据存储模块
+// Import data store module
 const dataStore = require('../models/mongoDataStore');
 
 const router = express.Router();
@@ -9,6 +11,7 @@ function hasPermission(user, group, action) {
       if (user.roles.includes('super-admin')) return true;
 
       // Check if user is a group admin (considering populated object format)
+      // 检查用户是否是群组管理员（考虑populate后的对象格式）
       return group.adminIds.some(admin => {
         const adminId = admin._id ? admin._id.toString() : admin.toString();
         return adminId === user.id.toString();
@@ -18,6 +21,7 @@ function hasPermission(user, group, action) {
       if (user.roles.includes('super-admin')) return true;
 
       // Check if user is a group member or admin (considering populated object format)
+      // 检查用户是否是群组成员或管理员（考虑populate后的对象格式）
       const isMember = group.memberIds.some(member => {
         const memberId = member._id ? member._id.toString() : member.toString();
         return memberId === user.id.toString();
@@ -36,10 +40,13 @@ function hasPermission(user, group, action) {
 }
 
 // STATIC ROUTES FIRST (no parameters)
+// 静态路由优先（无参数）
 
 /**
  * Get groups available for application (groups the user has not joined)
  * Returns a list of groups the user can apply to join.
+ * 获取可申请的群组（用户尚未加入的群组）
+ * 返回用户可以申请加入的群组列表。
  */
 router.get('/available', async (req, res) => {
   try {
@@ -61,6 +68,8 @@ router.get('/available', async (req, res) => {
 /**
  * Get all pending group join applications (super admin only)
  * Returns all pending applications for group membership.
+ * 获取所有待处理的群组加入申请（仅超级管理员）
+ * 返回所有待处理的群组成员申请。
  */
 router.get('/applications', async (req, res) => {
   try {
@@ -91,6 +100,10 @@ router.get('/applications', async (req, res) => {
  * @param {string} applicationId - The application ID
  * @param {string} action - 'approve' or 'reject'
  * @param {string} message - Optional review message
+ * 审核群组加入申请（批准或拒绝）
+ * @param {string} applicationId - 申请ID
+ * @param {string} action - 'approve' 或 'reject'
+ * @param {string} message - 可选的审核消息
  */
 router.post('/applications/:applicationId/review', async (req, res) => {
   try {
@@ -134,6 +147,8 @@ router.post('/applications/:applicationId/review', async (req, res) => {
 /**
  * Get all groups (admin use)
  * Super admin can see all groups, other admins see only their managed/joined groups.
+ * 获取所有群组（管理员使用）
+ * 超级管理员可以看到所有群组，其他管理员只能看到他们管理的/加入的群组。
  */
 router.get('/all', async (req, res) => {
   try {
@@ -148,11 +163,13 @@ router.get('/all', async (req, res) => {
     let userGroups = [];
 
     // Super admin sees all groups, others see only their managed/joined groups
+    // 超级管理员看到所有群组，其他人只看到他们管理的/加入的群组
     if (req.user.roles.includes('super-admin')) {
       userGroups = allGroups;
     } else {
       userGroups = allGroups.filter(group => {
         // Check if user is a member or admin of the group
+        // 检查用户是否是群组的成员或管理员
         const isMember = group.memberIds.some(member => {
           const memberId = member._id ? member._id.toString() : member.toString();
           return memberId === req.user.id.toString();
@@ -168,6 +185,7 @@ router.get('/all', async (req, res) => {
     }
 
     // Add channels info to each group
+    // 为每个群组添加频道信息
     const groupsWithChannels = await Promise.all(
       userGroups.map(async (group) => {
         const channels = await dataStore.getGroupChannels(group._id.toString());
@@ -195,6 +213,8 @@ router.get('/all', async (req, res) => {
 /**
  * Get groups for the current user
  * Super admin sees all groups, others see only their managed/joined groups.
+ * 获取当前用户的群组
+ * 超级管理员看到所有群组，其他人只看到他们管理的/加入的群组。
  */
 router.get('/', async (req, res) => {
   try {
@@ -206,6 +226,7 @@ router.get('/', async (req, res) => {
     } else {
       userGroups = allGroups.filter(group => {
         // Check if user is a member or admin of the group
+        // 检查用户是否是群组的成员或管理员
         const isMember = group.memberIds.some(member => {
           const memberId = member._id ? member._id.toString() : member.toString();
           return memberId === req.user.id.toString();
@@ -248,6 +269,8 @@ router.get('/', async (req, res) => {
 /**
  * Create a new group
  * Only group-admin or super-admin can create groups.
+ * 创建新群组
+ * 只有群组管理员或超级管理员可以创建群组。
  */
 router.post('/', async (req, res) => {
   try {
@@ -288,10 +311,13 @@ router.post('/', async (req, res) => {
 });
 
 // PARAMETERIZED ROUTES AFTER STATIC ROUTES
+// 参数化路由在静态路由之后
 
 /**
  * Get single group information
  * Returns detailed information about a specific group including its channels.
+ * 获取单个群组信息
+ * 返回特定群组的详细信息，包括其频道。
  */
 router.get('/:groupId', async (req, res) => {
   try {
@@ -313,6 +339,7 @@ router.get('/:groupId', async (req, res) => {
     }
 
     // Get group's channels
+    // 获取群组的频道
     const channels = await dataStore.getGroupChannels(groupId);
 
     res.json({
@@ -335,6 +362,8 @@ router.get('/:groupId', async (req, res) => {
 /**
  * Delete group
  * Removes a group from the system. Only super admins or group creators can delete groups.
+ * 删除群组
+ * 从系统中移除群组。只有超级管理员或群组创建者可以删除群组。
  */
 router.delete('/:groupId', async (req, res) => {
   try {
@@ -349,6 +378,7 @@ router.delete('/:groupId', async (req, res) => {
     }
 
     // Permission check: Super admins can delete all groups, group admins can only delete groups they created
+    // 权限检查：超级管理员可以删除所有群组，群组管理员只能删除他们创建的群组
     const isSuperAdmin = req.user.roles.includes('super-admin');
     const isCreator = group.createdBy.toString() === req.user.id.toString();
 
@@ -385,6 +415,8 @@ router.delete('/:groupId', async (req, res) => {
 /**
  * Apply to join group
  * Submits an application to join a specific group.
+ * 申请加入群组
+ * 提交加入特定群组的申请。
  */
 router.post('/:groupId/apply', async (req, res) => {
   try {
@@ -400,6 +432,7 @@ router.post('/:groupId/apply', async (req, res) => {
     }
 
     // Check if user is already a member (considering populated object format)
+    // 检查用户是否已经是成员（考虑populate后的对象格式）
     const isMember = group.memberIds.some(member => {
       const memberId = member._id ? member._id.toString() : member.toString();
       return memberId === req.user.id.toString();
@@ -447,6 +480,8 @@ router.post('/:groupId/apply', async (req, res) => {
 /**
  * Get group's pending applications (for admins)
  * Returns all pending applications for a specific group.
+ * 获取群组的待处理申请（管理员专用）
+ * 返回特定群组的所有待处理申请。
  */
 router.get('/:groupId/applications', async (req, res) => {
   try {
@@ -485,6 +520,8 @@ router.get('/:groupId/applications', async (req, res) => {
 /**
  * Get group channels list
  * Returns all channels for a specific group.
+ * 获取群组频道列表
+ * 返回特定群组的所有频道。
  */
 router.get('/:groupId/channels', async (req, res) => {
   try {
@@ -520,6 +557,8 @@ router.get('/:groupId/channels', async (req, res) => {
 /**
  * Create channel
  * Creates a new channel within a group.
+ * 创建频道
+ * 在群组中创建新频道。
  */
 router.post('/:groupId/channels', async (req, res) => {
   try {
@@ -672,6 +711,7 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     }
 
     // Check if user is already in the channel
+    // 检查用户是否已经在频道中
     const isAlreadyMember = channel.memberIds.some(memberId => {
       const id = memberId._id ? memberId._id.toString() : memberId.toString();
       return id === userId.toString();
@@ -737,6 +777,7 @@ router.delete('/:groupId/channels/:channelId/members/:userId', async (req, res) 
     }
 
     // Check if user is in the channel
+    // 检查用户是否在频道中
     const isMember = channel.memberIds.some(memberId => {
       const id = memberId._id ? memberId._id.toString() : memberId.toString();
       return id === userId.toString();
@@ -773,7 +814,7 @@ router.delete('/:groupId/channels/:channelId/members/:userId', async (req, res) 
   }
 });
 
-/**\\n * Add member to group\\n * Adds a user as a member to a specific group.\\n */
+/**\\n * Add member to group\\n * Adds a user as a member to a specific group.\\n * 添加成员到群组\\n * 将用户作为成员添加到特定群组。\\n */
 router.post('/:groupId/members', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -832,7 +873,7 @@ router.post('/:groupId/members', async (req, res) => {
   }
 });
 
-/**\\n * Remove member from group\\n * Removes a user from a specific group.\\n */
+/**\\n * Remove member from group\\n * Removes a user from a specific group.\\n * 从群组移除成员\\n * 从特定群组中移除用户。\\n */
 router.delete('/:groupId/members/:userId', async (req, res) => {
   try {
     const { groupId, userId } = req.params;
@@ -875,12 +916,13 @@ router.delete('/:groupId/members/:userId', async (req, res) => {
   }
 });
 
-/**\\n * Promote member to group admin (super admin only)\\n * Promotes a group member to administrator role.\\n */
+/**\\n * Promote member to group admin (super admin only)\\n * Promotes a group member to administrator role.\\n * 提升成员为群组管理员（仅超级管理员）\\n * 将群组成员提升为管理员角色。\\n */
 router.put('/:groupId/members/:userId/promote', async (req, res) => {
   try {
     const { groupId, userId } = req.params;
 
     // Check permissions: Only super admin can promote group administrators
+    // 检查权限：只有超级管理员可以提升群组管理员
     if (!req.user.roles.includes('super-admin')) {
       return res.status(403).json({
         success: false,
@@ -905,6 +947,7 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     }
 
     // Check if user is already a group administrator
+    // 检查用户是否已经是群组管理员
     const isAlreadyAdmin = group.adminIds.some(adminId => {
       const id = adminId._id ? adminId._id.toString() : adminId.toString();
       return id === userId.toString();
@@ -918,6 +961,7 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     }
 
     // Check if user is a group member
+    // 检查用户是否是群组成员
     const isMember = group.memberIds.some(memberId => {
       const id = memberId._id ? memberId._id.toString() : memberId.toString();
       return id === userId.toString();
@@ -931,6 +975,7 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     }
 
     // Promote user to group administrator
+    // 将用户提升为群组管理员
     const success = await dataStore.promoteUserToGroupAdmin(groupId, userId);
 
     if (success) {
