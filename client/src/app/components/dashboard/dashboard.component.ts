@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { GroupService } from '../../services/group.service';
+import { ProfileService } from '../../services/profile.service';
 import { User } from '../../models/user.model';
 import { Group } from '../../models/group.model';
 import { FormsModule } from '@angular/forms';
@@ -16,10 +17,20 @@ import { FormsModule } from '@angular/forms';
       <header class="dashboard-header">
         <h1>聊天系统</h1>
         <div class="user-info">
-          <span>欢迎, {{ currentUser?.username }}</span>
-          <span class="role-badge" [ngClass]="getRoleClass()">
-            {{ getRoleDisplay() }}
-          </span>
+          <div class="user-profile" (click)="goToProfile()">
+            <img
+              [src]="getAvatarUrl(currentUser?.avatar)"
+              [alt]="currentUser?.username"
+              class="user-avatar"
+              (error)="onAvatarError($event)"
+            />
+            <div class="user-details">
+              <span class="username">{{ currentUser?.username }}</span>
+              <span class="role-badge" [ngClass]="getRoleClass()">
+                {{ getRoleDisplay() }}
+              </span>
+            </div>
+          </div>
           <button class="btn btn-secondary" (click)="logout()">退出</button>
         </div>
       </header>
@@ -36,14 +47,23 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <div class="groups-list">
-            <div *ngFor="let group of groups" class="group-card" (click)="enterGroup(group)">
-              <h3>{{ group.name }}</h3>
-              <p>{{ group.description }}</p>
-              <div class="group-stats">
-                <span>{{ group.memberIds.length }} 成员</span>
-                <span>{{ group.channels.length }} 频道</span>
+            <div *ngFor="let group of groups" class="group-card">
+              <div class="group-content" (click)="enterGroup(group)">
+                <h3>{{ group.name }}</h3>
+                <p>{{ group.description }}</p>
+                <div class="group-stats">
+                  <span>{{ (group.memberIds.length || 0) }} 成员</span>
+                  <span>{{ (group.channels.length || 0) }} 频道</span>
+                </div>
+                <div *ngIf="isGroupAdminOf(group)" class="admin-badge">管理员</div>
               </div>
-              <div *ngIf="isGroupAdminOf(group)" class="admin-badge">管理员</div>
+              <button
+                *ngIf="canDeleteGroup(group)"
+                class="btn btn-danger btn-small group-delete"
+                (click)="deleteGroup(group, $event)"
+                title="删除群组">
+                删除
+              </button>
             </div>
           </div>
 
@@ -67,8 +87,8 @@ import { FormsModule } from '@angular/forms';
               <h3>{{ group.name }}</h3>
               <p>{{ group.description }}</p>
               <div class="group-stats">
-                <span>{{ group.memberIds.length }} 成员</span>
-                <span>{{ group.channels.length }} 频道</span>
+                <span>{{ (group.memberIds.length || 0) }} 成员</span>
+                <span>{{ (group.channels.length || 0) }} 频道</span>
               </div>
               <button class="btn btn-primary btn-small" (click)="applyToGroup(group)">
                 申请加入
@@ -100,8 +120,8 @@ import { FormsModule } from '@angular/forms';
           </div>
         </div>
 
-        <!-- Super Admin Panel -->
-        <div *ngIf="isSuperAdmin()" class="admin-section">
+        <!-- Admin Panel for Group Admins and Super Admins -->
+        <div *ngIf="canManageGroups()" class="admin-section">
           <h2>管理面板</h2>
 
           <div class="admin-tabs">
@@ -118,6 +138,7 @@ import { FormsModule } from '@angular/forms';
               群组管理
             </button>
             <button
+              *ngIf="isSuperAdmin()"
               class="tab-btn"
               [class.active]="activeTab === 'create-user'"
               (click)="activeTab = 'create-user'">
@@ -134,13 +155,19 @@ import { FormsModule } from '@angular/forms';
                 <span class="roles">{{ user.roles.join(', ') }}</span>
                 <div class="user-actions">
                   <button
-                    *ngIf="!user.roles.includes('group-admin')"
+                    *ngIf="isSuperAdmin() && !user.roles.includes('group-admin')"
                     class="btn btn-small btn-primary"
                     (click)="promoteToGroupAdmin(user)">
                     提升为群组管理员
                   </button>
                   <button
-                    *ngIf="user.id !== currentUser?.id"
+                    *ngIf="isSuperAdmin() && user.roles.includes('group-admin') && user.id !== currentUser?.id"
+                    class="btn btn-small btn-warning"
+                    (click)="demoteFromGroupAdmin(user)">
+                    取消管理员权限
+                  </button>
+                  <button
+                    *ngIf="isSuperAdmin() && user.id !== currentUser?.id"
                     class="btn btn-small btn-danger"
                     (click)="deleteUser(user)">
                     删除用户
@@ -158,7 +185,7 @@ import { FormsModule } from '@angular/forms';
                 <p>{{ group.description }}</p>
                 <div class="group-details">
                   <span>创建者ID: {{ group.createdBy }}</span>
-                  <span>成员数: {{ group.memberIds.length }}</span>
+                  <span>成员数: {{ group.memberIds.length || 0 }}</span>
                 </div>
               </div>
             </div>
@@ -283,6 +310,22 @@ import { FormsModule } from '@angular/forms';
       gap: 15px;
     }
 
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
     .role-badge {
       padding: 4px 8px;
       border-radius: 12px;
@@ -330,9 +373,29 @@ import { FormsModule } from '@angular/forms';
       border: 1px solid #ddd;
       border-radius: 8px;
       padding: 15px;
-      cursor: pointer;
       transition: all 0.3s;
       position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .group-content {
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .group-delete {
+      margin-left: 10px;
+      margin-top: 15px;
+      padding: 5px 10px;
+      font-size: 12px;
+      opacity: 0.8;
+      align-self: flex-end;
+    }
+
+    .group-delete:hover {
+      opacity: 1;
     }
 
     .group-card:hover {
@@ -546,6 +609,17 @@ import { FormsModule } from '@angular/forms';
       background-color: #c82333;
       border-color: #bd2130;
     }
+
+    .btn-warning {
+      background-color: #ffc107;
+      border-color: #ffc107;
+      color: #212529;
+    }
+
+    .btn-warning:hover {
+      background-color: #e0a800;
+      border-color: #d39e00;
+    }
   `]
 })
 export class DashboardComponent implements OnInit {
@@ -575,6 +649,7 @@ export class DashboardComponent implements OnInit {
   constructor(
     private authService: AuthService,
     private groupService: GroupService,
+    private profileService: ProfileService,
     private router: Router
   ) {}
 
@@ -594,12 +669,7 @@ export class DashboardComponent implements OnInit {
   }
 
   loadUserGroups(): void {
-    // For super admin, load all groups; for others, load user groups
-    const groupsObservable = this.isSuperAdmin()
-      ? this.groupService.getAllGroups()
-      : this.groupService.getUserGroups();
-
-    groupsObservable.subscribe({
+    this.groupService.getUserGroups().subscribe({
       next: groups => {
         console.log('User groups loaded:', groups);
         console.log('First group structure:', groups[0]);
@@ -723,6 +793,26 @@ export class DashboardComponent implements OnInit {
         return;
       }
       this.authService.updateUserRoles(userId, newRoles).subscribe({
+        next: () => {
+          this.loadAllUsers();
+          alert('用户权限已更新');
+        },
+        error: (error) => {
+          console.error('更新用户权限失败:', error);
+          alert('更新用户权限失败');
+        }
+      });
+    }
+  }
+
+  demoteFromGroupAdmin(user: User): void {
+    if (confirm(`确定要取消用户 ${user.username} 的群组管理员权限吗？`)) {
+      const userId = user._id || user.id;
+      if (!userId) {
+        alert('用户ID无效');
+        return;
+      }
+      this.authService.demoteUserRole(userId, 'group-admin').subscribe({
         next: () => {
           this.loadAllUsers();
           alert('用户权限已更新');
@@ -869,6 +959,67 @@ export class DashboardComponent implements OnInit {
 
   canCreateUsers(): boolean {
     return this.isSuperAdmin();
+  }
+
+  canDeleteGroup(group: Group): boolean {
+    if (!this.currentUser) return false;
+
+    // 超级管理员可以删除所有群组
+    if (this.isSuperAdmin()) return true;
+
+    // 群组创建者可以删除自己创建的群组
+    const createdById = group.createdBy?._id || group.createdBy?.id || group.createdBy;
+    return createdById === this.currentUser.id;
+  }
+
+  deleteGroup(group: Group, event: Event): void {
+    event.stopPropagation(); // 阻止卡片点击事件
+
+    if (!group) return;
+
+    const confirmMessage = `确定要删除群组 "${group.name}" 吗？此操作将删除群组内的所有频道和消息，且无法恢复。`;
+
+    if (confirm(confirmMessage)) {
+      const groupId = group._id || group.id!;
+
+      this.groupService.deleteGroup(groupId).subscribe({
+        next: (response) => {
+          if (response.success) {
+            alert('群组已成功删除');
+
+            // 从本地列表中移除已删除的群组
+            this.groups = this.groups.filter(g => (g._id || g.id) !== groupId);
+            this.allGroups = this.allGroups.filter(g => (g._id || g.id) !== groupId);
+
+            // 重新加载相关数据
+            this.loadUserGroups();
+            this.loadAvailableGroups();
+
+            if (this.isSuperAdmin()) {
+              this.loadAllGroups();
+            }
+          } else {
+            alert(response.message || '删除群组失败');
+          }
+        },
+        error: (error) => {
+          console.error('删除群组错误:', error);
+          alert('删除群组时发生错误：' + (error.error?.message || error.message || '未知错误'));
+        }
+      });
+    }
+  }
+
+  getAvatarUrl(avatar: string | null | undefined): string {
+    return this.profileService.getAvatarUrl(avatar);
+  }
+
+  onAvatarError(event: any): void {
+    event.target.src = '/assets/default-avatar.svg';
+  }
+
+  goToProfile(): void {
+    this.router.navigate(['/profile']);
   }
 
   logout(): void {

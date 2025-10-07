@@ -15,6 +15,7 @@ const authRoutes = require('./routes/auth');
 const groupRoutes = require('./routes/groups');
 const uploadRoutes = require('./routes/upload');
 const adminRoutes = require('./routes/admin');
+const profileRoutes = require('./routes/profile');
 
 // 导入中间件
 const { authenticateToken } = require('./middleware/auth');
@@ -60,6 +61,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/groups', authenticateToken, groupRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/profile', profileRoutes);
 
 // 健康检查端点
 app.get('/api/health', async (req, res) => {
@@ -123,7 +125,27 @@ io.on('connection', (socket) => {
 
       // 验证用户是否有权限访问该频道
       const channel = await mongoDataStore.findChannelById(channelId);
-      if (!channel || !channel.memberIds.some(id => id.toString() === user.id)) {
+      if (!channel) {
+        socket.emit('error', { message: '频道不存在' });
+        return;
+      }
+
+      // 检查用户权限（支持对象和字符串格式的memberIds）
+      const isMember = channel.memberIds.some(member => {
+        if (typeof member === 'string') {
+          return member === user.id;
+        } else if (typeof member === 'object' && member !== null) {
+          // 处理ObjectId类型和普通对象
+          const memberId = member._id ? member._id.toString() : (member.id ? member.id.toString() : '');
+          return memberId === user.id;
+        }
+        return false;
+      });
+
+      // 检查是否是超级管理员
+      const isSuperAdmin = user.roles && user.roles.includes('super-admin');
+
+      if (!isMember && !isSuperAdmin) {
         socket.emit('error', { message: '无权限访问该频道' });
         return;
       }
@@ -187,9 +209,46 @@ io.on('connection', (socket) => {
     try {
       const { channelId, message, user, type = 'text', fileUrl, fileName, fileSize, mimeType } = data;
 
+      // 调试日志
+      console.log('Received send-message data:', data);
+      console.log('User object:', user);
+      console.log('User ID:', user ? user.id : 'undefined');
+
+      // 验证消息内容
+      if (type === 'text' && (!message || message.trim() === '')) {
+        socket.emit('error', { message: '消息内容不能为空' });
+        return;
+      }
+
+      // 对于图片、文件、视频类型，需要fileUrl
+      if (['image', 'file', 'video'].includes(type) && !fileUrl) {
+        socket.emit('error', { message: '文件URL不能为空' });
+        return;
+      }
+
       // 验证权限
       const channel = await mongoDataStore.findChannelById(channelId);
-      if (!channel || !channel.memberIds.some(id => id.toString() === user.id)) {
+      if (!channel) {
+        socket.emit('error', { message: '频道不存在' });
+        return;
+      }
+
+      // 检查用户权限（支持对象和字符串格式的memberIds）
+      const isMember = channel.memberIds.some(member => {
+        if (typeof member === 'string') {
+          return member === user.id;
+        } else if (typeof member === 'object' && member !== null) {
+          // 处理ObjectId类型和普通对象
+          const memberId = member._id ? member._id.toString() : (member.id ? member.id.toString() : '');
+          return memberId === user.id;
+        }
+        return false;
+      });
+
+      // 检查是否是超级管理员
+      const isSuperAdmin = user.roles && user.roles.includes('super-admin');
+
+      if (!isMember && !isSuperAdmin) {
         socket.emit('error', { message: '无权限发送消息到该频道' });
         return;
       }

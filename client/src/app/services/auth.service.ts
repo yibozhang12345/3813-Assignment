@@ -47,6 +47,11 @@ export class AuthService {
     return this.currentUserSubject.value;
   }
 
+  updateCurrentUser(user: any): void {
+    this.currentUserSubject.next(user);
+    localStorage.setItem('currentUser', JSON.stringify(user));
+  }
+
   hasRole(role: string): boolean {
     const user = this.getCurrentUser();
     return user ? user.roles.includes(role) : false;
@@ -67,6 +72,10 @@ export class AuthService {
 
   updateUserRoles(userId: string, roles: string[]): Observable<any> {
     return this.http.put(`${this.API_URL}/auth/users/${userId}/promote`, { role: roles[roles.length - 1] });
+  }
+
+  demoteUserRole(userId: string, role: string): Observable<any> {
+    return this.http.put(`${this.API_URL}/auth/users/${userId}/demote`, { role });
   }
 
   registerUser(user: any): Observable<any> {

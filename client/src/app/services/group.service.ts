@@ -27,9 +27,16 @@ export class GroupService {
   }
 
   getAllGroups(): Observable<Group[]> {
-    return this.http.get<{ success: boolean; groups: Group[] }>(`${this.API_URL}/groups/all`)
+    return this.http.get<{ success: boolean; groups: Group[] }>(`${this.API_URL}/groups`)
       .pipe(
         map(response => response.groups || [])
+      );
+  }
+
+  getGroupById(groupId: string): Observable<Group> {
+    return this.http.get<{ success: boolean; group: Group }>(`${this.API_URL}/groups/${groupId}`)
+      .pipe(
+        map(response => response.group)
       );
   }
 
@@ -95,6 +102,41 @@ export class GroupService {
       );
   }
 
+  // 发送图片消息
+  sendImageMessage(groupId: string, channelId: string, imageUrl: string, fileSize: number, mimeType: string): Observable<Message> {
+    const currentUser = this.authService.getCurrentUser();
+    if (!currentUser) throw new Error('User not authenticated');
+
+    const payload = {
+      content: '',
+      type: 'image',
+      fileUrl: imageUrl,
+      fileSize: fileSize,
+      mimeType: mimeType
+    };
+
+    return this.http.post<{ success: boolean; message: Message }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}/messages`, payload)
+      .pipe(
+        map(response => response.message)
+      );
+  }
+
+  // 上传图片文件
+  uploadImage(file: File): Observable<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }> {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    return this.http.post<{ success: boolean; fileUrl: string; fileInfo: any }>(`${this.API_URL}/upload/image`, formData)
+      .pipe(
+        map(response => ({
+          fileUrl: response.fileUrl,
+          fileName: response.fileInfo.originalName,
+          fileSize: response.fileInfo.size,
+          mimeType: response.fileInfo.mimeType
+        }))
+      );
+  }
+
   getChannelMessages(groupId: string, channelId: string, limit: number = 50): Observable<Message[]> {
     return this.http.get<{ success: boolean; messages: Message[] }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}/messages?limit=${limit}`)
       .pipe(
@@ -146,5 +188,35 @@ export class GroupService {
       .pipe(
         map(response => response.user)
       );
+  }
+
+  // 提升用户为群组管理员（仅限超级管理员）
+  promoteUserToGroupAdmin(groupId: string, userId: string): Observable<{ success: boolean; message: string }> {
+    return this.http.put<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/members/${userId}/promote`, {});
+  }
+
+  // 撤销用户的群组管理员权限（仅限超级管理员）
+  demoteUserFromGroupAdmin(groupId: string, userId: string): Observable<{ success: boolean; message: string }> {
+    return this.http.put<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/members/${userId}/demote`, {});
+  }
+
+  // 删除频道
+  deleteChannel(groupId: string, channelId: string): Observable<{ success: boolean; message: string }> {
+    return this.http.delete<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}`);
+  }
+
+  // 添加成员到频道
+  addMemberToChannel(groupId: string, channelId: string, userId: string): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}/members`, { userId });
+  }
+
+  // 从频道移除成员
+  removeMemberFromChannel(groupId: string, channelId: string, userId: string): Observable<{ success: boolean; message: string }> {
+    return this.http.delete<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}/members/${userId}`);
+  }
+
+  // 删除群组
+  deleteGroup(groupId: string): Observable<{ success: boolean; message: string }> {
+    return this.http.delete<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}`);
   }
 }

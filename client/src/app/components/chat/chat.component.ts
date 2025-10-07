@@ -1,10 +1,11 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { GroupService } from '../../services/group.service';
+import { SocketService } from '../../services/socket.service';
 import { User } from '../../models/user.model';
 import { Group, Channel, Message } from '../../models/group.model';
 
@@ -38,9 +39,26 @@ import { Group, Channel, Message } from '../../models/group.model';
             <div
               *ngFor="let channel of currentGroup?.channels"
               class="channel-item"
-              [class.active]="currentChannel?.id === channel.id"
-              (click)="selectChannel(channel)">
-              # {{ channel.name }}
+              [class.active]="currentChannel?.id === channel.id">
+              <span (click)="selectChannel(channel)" class="channel-name">
+                # {{ channel.name }}
+              </span>
+              <div class="channel-actions">
+                <button
+                  *ngIf="canManageChannels()"
+                  class="btn btn-primary btn-small channel-manage"
+                  (click)="openChannelMembersModal(channel)"
+                  title="管理频道成员">
+                  ⚙️
+                </button>
+                <button
+                  *ngIf="canManageChannels() && channel.name !== 'general'"
+                  class="btn btn-danger btn-small channel-delete"
+                  (click)="deleteChannel(channel)"
+                  title="删除频道">
+                  ×
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -48,10 +66,10 @@ import { Group, Channel, Message } from '../../models/group.model';
         <div class="members-section">
           <h4>成员 ({{ getMemberCount() }})</h4>
           <div class="members-list">
-            <div *ngFor="let member of currentGroup?.memberIds" class="member-item">
-              {{ getMemberUsername(member._id || member.id || member) }}
-              <span *ngIf="isGroupAdmin(member._id || member.id || member)" class="admin-label">管理员</span>
-            </div>
+             <div *ngFor="let member of currentGroup?.memberIds" class="member-item">
+               {{ getMemberUsername(member) }}
+               <span *ngIf="isGroupAdmin(member)" class="admin-label">管理员</span>
+             </div>
           </div>
         </div>
 
@@ -76,23 +94,61 @@ import { Group, Channel, Message } from '../../models/group.model';
 
         <div class="chat-messages" *ngIf="currentChannel" #messagesContainer>
           <div *ngFor="let message of messages" class="message">
-            <div class="message-header">
-              <strong>{{ message.senderUsername }}</strong>
-              <span class="message-time">{{ formatTime(message.timestamp) }}</span>
+            <div class="message-avatar">
+              <img [src]="getAvatarUrl(message.senderId)"
+                   [alt]="message.senderUsername"
+                   class="avatar-small"
+                   (error)="onAvatarError($event)">
             </div>
-            <div class="message-content">{{ message.content }}</div>
+            <div class="message-content-wrapper">
+              <div class="message-header">
+                <strong>{{ message.senderUsername }}</strong>
+                <span class="message-time">{{ formatTime(message.timestamp) }}</span>
+              </div>
+              <div class="message-content">
+                <div *ngIf="message.type === 'text'">{{ message.content }}</div>
+                <div *ngIf="message.type === 'image'" class="image-message">
+                  <img [src]="'http://localhost:3000' + message.fileUrl"
+                       [alt]="'图片消息'"
+                       class="chat-image"
+                       (error)="onImageError($event)"
+                       (click)="openImagePreview('http://localhost:3000' + message.fileUrl)">
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="chat-input" *ngIf="currentChannel">
-          <form (ngSubmit)="sendMessage()">
-            <input
-              type="text"
-              [(ngModel)]="newMessage"
-              name="newMessage"
-              placeholder="输入消息..."
-              class="message-input">
-            <button type="submit" class="btn btn-primary">发送</button>
+        <div class="chat-input" *ngIf="currentGroup">
+          <div class="attachment-preview" *ngIf="selectedImage">
+            <div class="preview-container">
+              <span class="preview-filename">{{ selectedImage.name }}</span>
+              <button class="btn-remove-preview" (click)="removeImagePreview()">×</button>
+            </div>
+          </div>
+
+          <form (ngSubmit)="sendMessage()" class="message-form">
+            <div class="input-container">
+              <input
+                type="text"
+                [(ngModel)]="newMessage"
+                name="newMessage"
+                placeholder="输入消息..."
+                class="message-input"
+                [disabled]="isUploading">
+              <input
+                #fileInput
+                type="file"
+                accept="image/*"
+                (change)="onImageSelected($event)"
+                style="display: none">
+              <button type="button" class="btn-attachment" title="发送图片" (click)="triggerFileInput()" [disabled]="isUploading">
+                📎
+              </button>
+            </div>
+            <button type="submit" class="btn btn-primary" [disabled]="isUploading">
+              {{ isUploading ? '上传中...' : '发送' }}
+            </button>
           </form>
         </div>
       </div>
@@ -155,18 +211,74 @@ import { Group, Channel, Message } from '../../models/group.model';
         <div class="modal-content">
           <h3>管理成员</h3>
           <div class="members-management">
-            <div *ngFor="let member of currentGroup?.memberIds" class="member-management-item">
-              <span>{{ getMemberUsername(member._id || member.id || member) }}</span>
-              <button
-                *ngIf="(member._id || member.id || member) !== currentUser?.id && !isGroupAdmin(member._id || member.id || member)"
-                class="btn btn-danger btn-small"
-                (click)="removeMember(member._id || member.id || member)">
-                移除
-              </button>
-            </div>
+             <div *ngFor="let member of currentGroup?.memberIds" class="member-management-item">
+               <div class="member-info">
+                 <span>{{ getMemberUsername(member) }}</span>
+                 <span *ngIf="isGroupAdmin(member)" class="admin-label group-admin">群组管理员</span>
+               </div>
+               <div class="member-actions">
+                 <!-- Super Admin can promote/demote group admins -->
+                 <button
+                   *ngIf="authService.isSuperAdmin() && getMemberId(member) !== currentUser?.id && !isGroupAdmin(member)"
+                   class="btn btn-success btn-small"
+                   (click)="promoteToGroupAdmin(getMemberId(member))">
+                   提升为管理员
+                 </button>
+                 <button
+                   *ngIf="authService.isSuperAdmin() && getMemberId(member) !== currentUser?.id && isGroupAdmin(member)"
+                   class="btn btn-warning btn-small"
+                   (click)="demoteFromGroupAdmin(getMemberId(member))">
+                   撤销管理员
+                 </button>
+                 <!-- Regular remove member button -->
+                 <button
+                   *ngIf="getMemberId(member) !== currentUser?.id && !isGroupAdmin(member)"
+                   class="btn btn-danger btn-small"
+                   (click)="removeMember(getMemberId(member))">
+                   移除
+                 </button>
+               </div>
+             </div>
           </div>
           <div class="modal-actions">
             <button class="btn btn-secondary" (click)="showManageMembers = false">关闭</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manage Channel Members Modal -->
+      <div *ngIf="showChannelMembersModal" class="modal">
+        <div class="modal-content">
+          <h3>管理频道成员 - {{ selectedChannel?.name }}</h3>
+          <div class="channel-members-management">
+            <h4>添加成员到频道</h4>
+            <div class="users-to-add">
+              <div *ngFor="let user of usersNotInChannel" class="user-option">
+                <span>{{ getMemberUsername(user) }}</span>
+                <button *ngIf="user._id || user.id" class="btn btn-primary btn-small" (click)="addMemberToChannel(user._id || user.id!)">
+                  添加
+                </button>
+              </div>
+              <div *ngIf="usersNotInChannel.length === 0" class="no-users">
+                没有可添加的用户
+              </div>
+            </div>
+
+            <h4>频道成员</h4>
+            <div class="channel-members-list">
+              <div *ngFor="let member of selectedChannel?.memberIds" class="channel-member-item">
+                <span>{{ getMemberUsername(member) }}</span>
+                <button
+                  *ngIf="canManageChannels() && getMemberId(member) !== currentUser?.id"
+                  class="btn btn-danger btn-small"
+                  (click)="removeMemberFromChannel(getMemberId(member))">
+                  移除
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" (click)="showChannelMembersModal = false">关闭</button>
           </div>
         </div>
       </div>
@@ -226,10 +338,12 @@ import { Group, Channel, Message } from '../../models/group.model';
 
     .channel-item {
       padding: 8px 12px;
-      cursor: pointer;
       border-radius: 4px;
       margin-bottom: 4px;
       transition: background-color 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .channel-item:hover {
@@ -238,6 +352,45 @@ import { Group, Channel, Message } from '../../models/group.model';
 
     .channel-item.active {
       background-color: #3498db;
+    }
+
+    .channel-name {
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .channel-delete {
+      background: transparent;
+      border: 1px solid #e74c3c;
+      color: #e74c3c;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      line-height: 1;
+      margin-left: 5px;
+      opacity: 0.7;
+      padding: 0;
+    }
+
+    .channel-delete:hover {
+      background: #e74c3c;
+      color: white;
+      opacity: 1;
+    }
+
+    .channel-item.active .channel-delete {
+      border-color: rgba(255, 255, 255, 0.7);
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .channel-item.active .channel-delete:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: white;
+      color: white;
     }
 
     .members-list {
@@ -255,9 +408,16 @@ import { Group, Channel, Message } from '../../models/group.model';
 
     .admin-label {
       background-color: #f39c12;
-      padding: 2px 6px;
-      border-radius: 10px;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 12px;
       font-size: 10px;
+      font-weight: bold;
+      margin-left: 8px;
+    }
+
+    .admin-label.group-admin {
+      background-color: #e74c3c;
     }
 
     .group-management {
@@ -301,11 +461,28 @@ import { Group, Channel, Message } from '../../models/group.model';
     }
 
     .message {
+      display: flex;
       background-color: white;
       margin-bottom: 15px;
       padding: 12px;
       border-radius: 8px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .message-avatar {
+      margin-right: 12px;
+    }
+
+    .avatar-small {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #e1e5e9;
+    }
+
+    .message-content-wrapper {
+      flex: 1;
     }
 
     .message-header {
@@ -329,24 +506,122 @@ import { Group, Channel, Message } from '../../models/group.model';
       line-height: 1.4;
     }
 
+    .image-message {
+      margin-top: 8px;
+    }
+
+    .chat-image {
+      max-width: 300px;
+      max-height: 300px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .chat-image:hover {
+      transform: scale(1.05);
+    }
+
     .chat-input {
       padding: 20px;
       border-top: 1px solid #ecf0f1;
       background-color: white;
     }
 
-    .chat-input form {
+    .attachment-preview {
+      margin-bottom: 10px;
+      padding: 8px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+      border: 1px dashed #dee2e6;
+    }
+
+    .preview-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .preview-filename {
+      font-size: 14px;
+      color: #495057;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 200px;
+    }
+
+    .btn-remove-preview {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-remove-preview:hover {
+      background: #c82333;
+    }
+
+    .message-form {
       display: flex;
       gap: 10px;
     }
 
+    .input-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      border: 1px solid #ddd;
+      border-radius: 25px;
+      padding: 0 12px;
+    }
+
     .message-input {
       flex: 1;
-      padding: 12px;
-      border: 1px solid #ddd;
+      padding: 12px 0;
+      border: none;
       border-radius: 25px;
       font-size: 14px;
       outline: none;
+    }
+
+    .message-input:disabled {
+      background-color: #f8f9fa;
+    }
+
+    .btn-attachment {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 8px;
+      color: #6c757d;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .btn-attachment:hover:not(:disabled) {
+      background-color: #007bff;
+      border-color: #007bff;
+      color: white;
+      transform: scale(1.1);
+    }
+
+    .btn-attachment:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .message-input:focus {
@@ -401,10 +676,74 @@ import { Group, Channel, Message } from '../../models/group.model';
       border-bottom: 1px solid #eee;
     }
 
+    .member-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .member-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
     .no-users {
       text-align: center;
       color: #666;
       padding: 20px;
+    }
+
+    .channel-actions {
+      display: flex;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .channel-manage {
+      background: transparent;
+      border: 1px solid #3498db;
+      color: #3498db;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      line-height: 1;
+      padding: 0;
+      opacity: 0.7;
+    }
+
+    .channel-manage:hover {
+      background: #3498db;
+      color: white;
+      opacity: 1;
+    }
+
+    .channel-members-management {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .channel-members-management h4 {
+      margin: 15px 0 10px 0;
+      color: #2c3e50;
+    }
+
+    .channel-member-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .channel-members-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 10px;
     }
   `]
 })
@@ -416,9 +755,16 @@ export class ChatComponent implements OnInit, OnDestroy {
   newMessage = '';
   allUsers: User[] = [];
 
+  // 图片上传相关属性
+  selectedImage: File | null = null;
+  isUploading = false;
+  @ViewChild('fileInput') fileInput!: ElementRef;
+
   showCreateChannel = false;
   showAddUser = false;
   showManageMembers = false;
+  showChannelMembersModal = false;
+  selectedChannel: Channel | null = null;
   newChannelName = '';
   newChannelDescription = '';
 
@@ -427,8 +773,9 @@ export class ChatComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private authService: AuthService,
-    private groupService: GroupService
+    public authService: AuthService,
+    private groupService: GroupService,
+    private socketService: SocketService
   ) {
     console.log('ChatComponent constructor called');
   }
@@ -439,9 +786,14 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     console.log('ChatComponent ngOnInit called');
+    // Fixed double event binding issue - no more duplicate messages
     this.currentUser = this.authService.getCurrentUser();
     console.log('Current user:', this.currentUser);
     this.loadAllUsers();
+
+    // 初始化Socket连接
+    this.socketService.connect();
+    this.setupSocketListeners();
 
     this.routeSubscription = this.route.params.subscribe(params => {
       console.log('Route params received:', params);
@@ -457,21 +809,44 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.routeSubscription.unsubscribe();
+    // 断开Socket连接
+    this.socketService.disconnect();
+  }
+
+  setupSocketListeners(): void {
+    // 监听新消息
+    this.socketService.onMessageReceived((message: Message) => {
+      console.log('收到新消息:', message);
+
+      // 只有当消息属于当前频道时才添加到消息列表
+      if (this.currentChannel && message.channelId === (this.currentChannel.id || this.currentChannel._id)) {
+        this.messages.push(message);
+        setTimeout(() => this.scrollToBottom(), 100);
+      }
+    });
+
+    // 监听错误
+    this.socketService.onError((error: any) => {
+      console.error('Socket错误:', error);
+      alert('连接错误: ' + error.message);
+    });
   }
 
   loadGroup(groupId: string): void {
     console.log('Loading group with ID:', groupId);
-    this.groupService.getAllGroups().subscribe({
-      next: (groups) => {
-        console.log('All groups:', groups);
-        this.currentGroup = groups.find(g => (g._id === groupId || g.id === groupId)) || null;
-        console.log('Found group:', this.currentGroup);
-        if (this.currentGroup && this.currentGroup.channels.length > 0) {
+    this.groupService.getGroupById(groupId).subscribe({
+      next: (group) => {
+        console.log('Loaded group with channels:', group);
+        this.currentGroup = group;
+        if (this.currentGroup && this.currentGroup.channels && this.currentGroup.channels.length > 0) {
+          console.log('Auto-selecting first channel:', this.currentGroup.channels[0]);
           this.selectChannel(this.currentGroup.channels[0]);
+        } else {
+          console.log('No channels found in group:', this.currentGroup);
         }
       },
       error: (error) => {
-        console.error('Error loading groups:', error);
+        console.error('Error loading group:', error);
         this.currentGroup = null;
       }
     });
@@ -491,7 +866,22 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   selectChannel(channel: Channel): void {
+    // 如果已经在一个频道中，先离开该频道
+    if (this.currentChannel) {
+      const currentChannelId = this.currentChannel.id || this.currentChannel._id;
+      if (currentChannelId) {
+        this.socketService.leaveChannel(currentChannelId);
+      }
+    }
+
     this.currentChannel = channel;
+
+    // 加入新频道
+    const newChannelId = channel.id || channel._id;
+    if (newChannelId) {
+      this.socketService.joinChannel(newChannelId);
+    }
+
     this.loadMessages();
   }
 
@@ -501,19 +891,48 @@ export class ChatComponent implements OnInit, OnDestroy {
       const channelId = this.currentChannel.id || this.currentChannel._id!;
       this.groupService.getChannelMessages(groupId, channelId).subscribe(messages => {
         this.messages = messages;
+        // 加载消息后滚动到底部
+        setTimeout(() => this.scrollToBottom(), 100);
       });
     }
   }
 
   sendMessage(): void {
-    if (!this.newMessage.trim() || !this.currentChannel || !this.currentGroup) return;
+    console.log('sendMessage called');
+    console.log('newMessage:', this.newMessage);
+    console.log('currentChannel:', this.currentChannel);
+    console.log('currentGroup:', this.currentGroup);
+
+    // 如果有选中的图片，发送图片消息
+    if (this.selectedImage) {
+      this.sendImageMessage();
+      return;
+    }
+
+    // 如果没有文本消息且没有图片，直接返回
+    if (!this.newMessage.trim()) {
+      console.log('Empty message, returning');
+      return;
+    }
+
+    if (!this.currentGroup || !this.currentChannel) {
+      console.log('No current group or channel, returning');
+      return;
+    }
 
     const groupId = this.currentGroup.id || this.currentGroup._id!;
     const channelId = this.currentChannel.id || this.currentChannel._id!;
-    this.groupService.sendMessage(groupId, channelId, this.newMessage).subscribe(message => {
-      this.messages.push(message);
-      this.newMessage = '';
-    });
+
+    if (!channelId) {
+      console.log('No valid channel ID, returning');
+      return;
+    }
+
+    // 使用Socket.IO发送消息
+    this.socketService.sendMessage(channelId, this.newMessage, 'text');
+
+    // 清空输入框
+    this.newMessage = '';
   }
 
   createChannel(): void {
@@ -524,6 +943,9 @@ export class ChatComponent implements OnInit, OnDestroy {
       name: this.newChannelName,
       description: this.newChannelDescription
     }).subscribe(channel => {
+      if (!this.currentGroup!.channels) {
+        this.currentGroup!.channels = [];
+      }
       this.currentGroup!.channels.push(channel);
       this.cancelCreateChannel();
     });
@@ -533,6 +955,50 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.showCreateChannel = false;
     this.newChannelName = '';
     this.newChannelDescription = '';
+  }
+
+  deleteChannel(channel: Channel): void {
+    if (!this.currentGroup || !channel) return;
+
+    if (channel.name === 'general') {
+      alert('无法删除默认频道');
+      return;
+    }
+
+    if (confirm(`确定要删除频道 "#${channel.name}" 吗？此操作无法撤销，频道内的所有消息也将被删除。`)) {
+      const groupId = this.currentGroup.id || this.currentGroup._id!;
+      const channelId = channel.id || channel._id!;
+
+      this.groupService.deleteChannel(groupId, channelId).subscribe({
+        next: (response) => {
+          if (response.success) {
+            // 从本地群组数据中移除已删除的频道
+            if (this.currentGroup!.channels) {
+              this.currentGroup!.channels = this.currentGroup!.channels.filter(c =>
+                (c.id || c._id) !== channelId
+              );
+            }
+
+            // 如果删除的是当前频道，切换到第一个可用频道
+            if (this.currentChannel && (this.currentChannel.id || this.currentChannel._id) === channelId) {
+              this.currentChannel = null;
+              this.messages = [];
+              if (this.currentGroup!.channels && this.currentGroup!.channels.length > 0) {
+                this.selectChannel(this.currentGroup!.channels[0]);
+              }
+            }
+
+            alert('频道已成功删除');
+          } else {
+            alert(response.message || '删除频道失败');
+          }
+        },
+        error: (error) => {
+          console.error('删除频道错误:', error);
+          alert('删除频道时发生错误：' + (error.error?.message || error.message || '未知错误'));
+        }
+      });
+    }
   }
 
   addUserToGroup(userId: string): void {
@@ -585,8 +1051,62 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
   }
 
+  promoteToGroupAdmin(memberId: string): void {
+    if (!this.currentGroup) return;
+
+    const username = this.getMemberUsername(memberId);
+    if (confirm(`确定要提升用户 ${username} 为群组管理员吗？`)) {
+      const groupId = this.currentGroup.id || this.currentGroup._id!;
+      console.log('Promoting user to group admin:', { groupId, memberId });
+
+      this.groupService.promoteUserToGroupAdmin(groupId, memberId).subscribe({
+        next: (response) => {
+          console.log('Promote user response:', response);
+          if (response.success) {
+            alert('用户已成功提升为群组管理员');
+            // 重新加载群组数据以确保数据一致性
+            this.loadGroup(groupId);
+          } else {
+            alert(response.message || '提升用户失败');
+          }
+        },
+        error: (error) => {
+          console.error('Promote user error:', error);
+          alert('提升用户时发生错误：' + (error.error?.message || error.message || '未知错误'));
+        }
+      });
+    }
+  }
+
+  demoteFromGroupAdmin(memberId: string): void {
+    if (!this.currentGroup) return;
+
+    const username = this.getMemberUsername(memberId);
+    if (confirm(`确定要撤销用户 ${username} 的群组管理员权限吗？`)) {
+      const groupId = this.currentGroup.id || this.currentGroup._id!;
+      console.log('Demoting user from group admin:', { groupId, memberId });
+
+      this.groupService.demoteUserFromGroupAdmin(groupId, memberId).subscribe({
+        next: (response) => {
+          console.log('Demote user response:', response);
+          if (response.success) {
+            alert('用户的群组管理员权限已被撤销');
+            // 重新加载群组数据以确保数据一致性
+            this.loadGroup(groupId);
+          } else {
+            alert(response.message || '撤销权限失败');
+          }
+        },
+        error: (error) => {
+          console.error('Demote user error:', error);
+          alert('撤销权限时发生错误：' + (error.error?.message || error.message || '未知错误'));
+        }
+      });
+    }
+  }
+
   get usersNotInGroup(): User[] {
-    if (!this.currentGroup) return [];
+    if (!this.currentGroup || !this.allUsers) return [];
 
     console.log('Computing usersNotInGroup:', {
       allUsers: this.allUsers.map(u => ({ _id: u._id, id: u.id, username: u.username })),
@@ -595,7 +1115,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     });
 
     // 获取群组成员的ID列表（支持对象和字符串格式）
-    const memberIds = this.currentGroup.memberIds.map(member =>
+    const memberIds = (this.currentGroup.memberIds || []).map(member =>
       typeof member === 'string' ? member : (member._id || member.id)
     );
 
@@ -614,9 +1134,38 @@ export class ChatComponent implements OnInit, OnDestroy {
     return filtered;
   }
 
+  get usersNotInChannel(): User[] {
+    if (!this.selectedChannel || !this.allUsers || !this.selectedChannel.memberIds) return [];
+
+    // 获取频道成员的ID列表（支持对象和字符串格式）
+    const memberIds = this.selectedChannel.memberIds.map((member: any) =>
+      typeof member === 'string' ? member : (member._id || member.id)
+    );
+
+    // 过滤出不在频道中的用户（同时检查_id和id字段）
+    const filtered = this.allUsers.filter(user => {
+      const userId = user._id || user.id;
+      const isInChannel = memberIds.includes(userId);
+      return !isInChannel;
+    });
+
+    return filtered;
+  }
+
   canManageGroup(): boolean {
-    if (!this.currentGroup || !this.currentUser) return false;
-    return this.currentGroup.adminIds.includes(this.currentUser.id) || this.authService.isSuperAdmin();
+    if (!this.currentGroup || !this.currentUser || !this.currentUser.id) return false;
+
+    // 检查是否是超级管理员
+    if (this.authService.isSuperAdmin()) return true;
+
+    // 检查是否是群组管理员（考虑populate后的对象格式）
+    return this.currentGroup.adminIds.some(admin => {
+      // 处理各种可能的ID格式
+      const adminId = admin && typeof admin === 'object' ?
+        (admin._id ? admin._id.toString() : (admin.id ? admin.id.toString() : '')) :
+        admin.toString();
+      return adminId === this.currentUser!.id!.toString();
+    });
   }
 
   canManageChannels(): boolean {
@@ -628,12 +1177,34 @@ export class ChatComponent implements OnInit, OnDestroy {
 
     // 获取用户ID（支持字符串ID或对象）
     const userId = typeof userIdOrObject === 'string' ? userIdOrObject : (userIdOrObject?._id || userIdOrObject?.id);
+    if (!userId) return false;
 
-    return this.currentGroup.adminIds.includes(userId);
+    console.log('Checking isGroupAdmin for user:', userId);
+    console.log('Current group adminIds:', this.currentGroup.adminIds);
+
+    // 检查是否是群组管理员（考虑populate后的对象格式）
+    const isAdmin = this.currentGroup.adminIds.some(admin => {
+      // 处理各种可能的ID格式
+      const adminId = admin && typeof admin === 'object' ?
+        (admin._id ? admin._id.toString() : (admin.id ? admin.id.toString() : '')) :
+        admin.toString();
+      console.log('Comparing adminId:', adminId, 'with userId:', userId.toString());
+      return adminId === userId.toString();
+    });
+
+    console.log('isGroupAdmin result:', isAdmin);
+    return isAdmin;
   }
 
   getMemberCount(): number {
-    return this.currentGroup ? this.currentGroup.memberIds.length : 0;
+    return this.currentGroup ? (this.currentGroup.memberIds?.length || 0) : 0;
+  }
+
+  getMemberId(member: any): string {
+    if (typeof member === 'string') {
+      return member;
+    }
+    return member?._id || member?.id || '';
   }
 
   getMemberUsername(userIdOrObject: string | any): string {
@@ -661,6 +1232,163 @@ export class ChatComponent implements OnInit, OnDestroy {
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  // 图片处理方法
+  triggerFileInput(): void {
+    this.fileInput.nativeElement.click();
+  }
+
+  onImageSelected(event: any): void {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // 验证文件类型
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件');
+      return;
+    }
+
+    // 验证文件大小 (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('文件大小不能超过5MB');
+      return;
+    }
+
+    this.selectedImage = file;
+  }
+
+  removeImagePreview(): void {
+    this.selectedImage = null;
+    if (this.fileInput && this.fileInput.nativeElement) {
+      this.fileInput.nativeElement.value = '';
+    }
+  }
+
+  // 频道成员管理
+  openChannelMembersModal(channel: Channel): void {
+    this.selectedChannel = channel;
+    this.showChannelMembersModal = true;
+  }
+
+  addMemberToChannel(userId: string): void {
+    if (!this.currentGroup || !this.selectedChannel) return;
+
+    const groupId = this.currentGroup.id || this.currentGroup._id!;
+    const channelId = this.selectedChannel.id || this.selectedChannel._id!;
+
+    this.groupService.addMemberToChannel(groupId, channelId, userId).subscribe({
+      next: (response) => {
+        if (response.success) {
+          alert('用户已添加到频道');
+          // 这里可以更新频道成员列表，如果需要的话
+        } else {
+          alert(response.message || '添加用户失败');
+        }
+      },
+      error: (error) => {
+        console.error('添加用户到频道错误:', error);
+        alert('添加用户到频道时发生错误：' + (error.error?.message || error.message || '未知错误'));
+      }
+    });
+  }
+
+  removeMemberFromChannel(userId: string): void {
+    if (!this.currentGroup || !this.selectedChannel) return;
+
+    const username = this.getMemberUsername(userId);
+    if (confirm(`确定要从频道 ${this.selectedChannel.name} 中移除用户 ${username} 吗？`)) {
+      const groupId = this.currentGroup.id || this.currentGroup._id!;
+      const channelId = this.selectedChannel.id || this.selectedChannel._id!;
+
+      this.groupService.removeMemberFromChannel(groupId, channelId, userId).subscribe({
+        next: (response) => {
+          if (response.success) {
+            alert('用户已从频道移除');
+            // 这里可以更新频道成员列表，如果需要的话
+          } else {
+            alert(response.message || '移除用户失败');
+          }
+        },
+        error: (error) => {
+          console.error('从频道移除用户错误:', error);
+          alert('从频道移除用户时发生错误：' + (error.error?.message || error.message || '未知错误'));
+        }
+      });
+    }
+  }
+
+  sendImageMessage(): void {
+    if (!this.selectedImage || !this.currentGroup || !this.currentChannel) return;
+
+    this.isUploading = true;
+
+    // 上传图片
+    this.groupService.uploadImage(this.selectedImage).subscribe({
+      next: (result) => {
+        console.log('Upload result:', result);
+        // 发送图片消息
+        const channelId = this.currentChannel!.id || this.currentChannel!._id!;
+
+        console.log('Sending image message with:', {
+          fileUrl: result.fileUrl,
+          fileSize: result.fileSize,
+          mimeType: result.mimeType
+        });
+
+        // 使用Socket.IO发送图片消息
+        this.socketService.sendMessage(
+          channelId,
+          '', // 图片消息内容为空
+          'image',
+          result.fileUrl,
+          result.fileSize,
+          result.mimeType
+        );
+
+        // 清空图片预览
+        this.removeImagePreview();
+        this.isUploading = false;
+      },
+      error: (error) => {
+        console.error('上传图片失败:', error);
+        alert('上传图片失败: ' + (error.error?.message || error.message));
+        this.isUploading = false;
+      }
+    });
+  }
+
+  onImageError(event: any): void {
+    event.target.src = 'assets/default-image.png';
+  }
+
+  openImagePreview(imageUrl: string): void {
+    // 在实际应用中，可以打开一个模态框显示大图
+    window.open(imageUrl, '_blank');
+  }
+
+  scrollToBottom(): void {
+    try {
+      const messagesContainer = document.querySelector('.chat-messages');
+      if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    } catch(err) {
+      console.log('Scroll to bottom error:', err);
+    }
+  }
+
+  // 头像相关方法
+  getAvatarUrl(userId: string): string {
+    // 在实际应用中，你可能需要从用户数据中获取头像URL
+    // 这里我们检查是否有用户数据包含头像信息
+    // 如果有用户数据，可以在这里查找对应的头像
+    // 目前返回默认头像
+    return '/assets/default-avatar.png';
+  }
+
+  onAvatarError(event: any): void {
+    event.target.src = '/assets/default-avatar.png';
   }
 
   goBack(): void {

@@ -101,6 +101,9 @@ class MongoDataStore {
           { $pull: { memberIds: userId } }
         );
 
+        // 删除该用户的所有群组申请记录
+        await GroupApplication.deleteMany({ userId: userId });
+
         return true;
       }
       return false;
@@ -190,6 +193,35 @@ class MongoDataStore {
     }
   }
 
+  async deleteGroup(groupId) {
+    try {
+      // 获取群组信息
+      const group = await Group.findById(groupId);
+      if (!group) return false;
+
+      // 删除群组的所有频道和相关消息
+      const channels = await Channel.find({ groupId: groupId });
+      for (const channel of channels) {
+        // 删除频道中的所有消息
+        await Message.deleteMany({ channelId: channel._id });
+      }
+
+      // 删除所有频道
+      await Channel.deleteMany({ groupId: groupId });
+
+      // 删除群组申请记录
+      await GroupApplication.deleteMany({ groupId: groupId });
+
+      // 删除群组
+      const result = await Group.findByIdAndDelete(groupId);
+
+      return !!result;
+    } catch (error) {
+      console.error('删除群组失败:', error);
+      throw error;
+    }
+  }
+
   async addUserToGroup(groupId, userId) {
     try {
       const group = await Group.findById(groupId);
@@ -230,6 +262,53 @@ class MongoDataStore {
     }
   }
 
+  async promoteUserToGroupAdmin(groupId, userId) {
+    try {
+      const group = await Group.findById(groupId);
+      if (!group) return false;
+
+      // 检查用户是否已经是管理员
+      if (group.adminIds.includes(userId)) {
+        return false;
+      }
+
+      // 检查用户是否是成员
+      if (!group.memberIds.includes(userId)) {
+        return false;
+      }
+
+      // 将用户添加到管理员列表
+      group.adminIds.push(userId);
+      await group.save();
+
+      return true;
+    } catch (error) {
+      console.error('提升用户为群组管理员失败:', error);
+      throw error;
+    }
+  }
+
+  async demoteUserFromGroupAdmin(groupId, userId) {
+    try {
+      const group = await Group.findById(groupId);
+      if (!group) return false;
+
+      // 检查用户是否是管理员
+      if (!group.adminIds.includes(userId)) {
+        return false;
+      }
+
+      // 从管理员列表中移除用户（用户仍然保持成员身份）
+      group.adminIds = group.adminIds.filter(adminId => adminId.toString() !== userId.toString());
+      await group.save();
+
+      return true;
+    } catch (error) {
+      console.error('撤销群组管理员权限失败:', error);
+      throw error;
+    }
+  }
+
   // 频道管理方法
   async getGroupChannels(groupId) {
     try {
@@ -266,6 +345,21 @@ class MongoDataStore {
         .populate('groupId', 'name');
     } catch (error) {
       console.error('查找频道失败:', error);
+      throw error;
+    }
+  }
+
+  async deleteChannel(channelId) {
+    try {
+      // 删除频道中的所有消息
+      await Message.deleteMany({ channelId: channelId });
+
+      // 删除频道
+      const result = await Channel.findByIdAndDelete(channelId);
+
+      return !!result;
+    } catch (error) {
+      console.error('删除频道失败:', error);
       throw error;
     }
   }
@@ -376,12 +470,25 @@ class MongoDataStore {
   // 群组申请管理方法
   async getAvailableGroups(userId) {
     try {
-      return await Group.find({
+      // 获取用户未加入的群组
+      const groups = await Group.find({
         $and: [
           { memberIds: { $ne: userId } },
           { adminIds: { $ne: userId } }
         ]
       }).populate('adminIds memberIds', 'username email avatar');
+
+      // 为每个群组获取频道数量
+      const GroupsWithChannelCount = await Promise.all(
+        groups.map(async (group) => {
+          const channelCount = await Channel.countDocuments({ groupId: group._id });
+          const groupObj = group.toObject();
+          groupObj.channels = [{ id: 'general', name: 'general' }]; // 模拟默认频道
+          return groupObj;
+        })
+      );
+
+      return GroupsWithChannelCount;
     } catch (error) {
       console.error('获取可申请群组失败:', error);
       throw error;
