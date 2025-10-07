@@ -318,35 +318,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 视频通话信令
-  socket.on('video-call-offer', (data) => {
-    const { targetUserId, offer, callerId } = data;
-    const targetSocketId = userSockets.get(targetUserId);
-
-    if (targetSocketId) {
-      io.to(targetSocketId).emit('video-call-offer', {
-        offer,
-        callerId,
-        callerSocketId: socket.id
-      });
-    }
-  });
-
-  socket.on('video-call-answer', (data) => {
-    const { callerSocketId, answer } = data;
-    socket.to(callerSocketId).emit('video-call-answer', { answer });
-  });
-
-  socket.on('video-call-ice-candidate', (data) => {
-    const { targetSocketId, candidate } = data;
-    socket.to(targetSocketId).emit('video-call-ice-candidate', { candidate });
-  });
-
-  socket.on('video-call-end', (data) => {
-    const { targetSocketId } = data;
-    socket.to(targetSocketId).emit('video-call-end');
-  });
-
   // 断开连接
   socket.on('disconnect', async () => {
     try {
