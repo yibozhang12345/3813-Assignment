@@ -6,19 +6,19 @@ const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
-// 配置文件存储
+// Configure file storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     let uploadPath = './uploads/files';
 
-    // 根据文件类型选择不同的存储目录
+    // Select different storage directories based on file type
     if (file.fieldname === 'avatar') {
       uploadPath = './uploads/avatars';
     } else if (file.mimetype.startsWith('image/')) {
       uploadPath = './uploads/images';
     }
 
-    // 确保目录存在
+    // Ensure directory exists
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
     }
@@ -26,7 +26,7 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    // 生成唯一文件名
+    // Generate unique filename
     const uniqueSuffix = uuidv4();
     const ext = path.extname(file.originalname);
     const name = path.basename(file.originalname, ext);
@@ -34,25 +34,25 @@ const storage = multer.diskStorage({
   }
 });
 
-// 文件过滤器
+// File filter
 const fileFilter = (req, file, cb) => {
-  // 允许的文件类型
+  // Allowed file types
   const allowedTypes = {
     avatar: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'],
     image: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
     file: [
-      // 图片
+      // Images
       'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
-      // 文档
+      // Documents
       'application/pdf', 'text/plain', 'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-powerpoint',
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      // 压缩文件
+      // Archives
       'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-      // 其他
+      // Other
       'application/json', 'text/csv'
     ]
   };
@@ -63,27 +63,30 @@ const fileFilter = (req, file, cb) => {
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error(`不支持的文件类型: ${file.mimetype}`), false);
+    cb(new Error(`Unsupported file type: ${file.mimetype}`), false);
   }
 };
 
-// 配置 multer
+// Configure multer
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // 默认 10MB
-    files: 5 // 最多 5 个文件
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // Default 10MB
+    files: 5 // Maximum 5 files
   }
 });
 
-// 头像上传
+/**
+ * Upload avatar
+ * Handles avatar image upload for user profiles.
+ */
 router.post('/avatar', upload.single('avatar'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: '没有上传文件'
+        message: 'No file uploaded'
       });
     }
 
@@ -91,7 +94,7 @@ router.post('/avatar', upload.single('avatar'), (req, res) => {
 
     res.json({
       success: true,
-      message: '头像上传成功',
+      message: 'Avatar uploaded successfully',
       fileUrl: fileUrl,
       fileInfo: {
         originalName: req.file.originalname,
@@ -105,18 +108,21 @@ router.post('/avatar', upload.single('avatar'), (req, res) => {
     console.error('Avatar upload error:', error);
     res.status(500).json({
       success: false,
-      message: '上传失败'
+      message: 'Upload failed'
     });
   }
 });
 
-// 聊天图片上传
+/**
+ * Upload chat image
+ * Handles image upload for chat messages.
+ */
 router.post('/image', upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: '没有上传文件'
+        message: 'No file uploaded'
       });
     }
 
@@ -124,7 +130,7 @@ router.post('/image', upload.single('image'), (req, res) => {
 
     res.json({
       success: true,
-      message: '图片上传成功',
+      message: 'Image uploaded successfully',
       fileUrl: fileUrl,
       fileInfo: {
         originalName: req.file.originalname,
@@ -140,18 +146,21 @@ router.post('/image', upload.single('image'), (req, res) => {
     console.error('Image upload error:', error);
     res.status(500).json({
       success: false,
-      message: '上传失败'
+      message: 'Upload failed'
     });
   }
 });
 
-// 文件上传
+/**
+ * Upload single file
+ * Handles general file upload with automatic directory selection.
+ */
 router.post('/file', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: '没有上传文件'
+        message: 'No file uploaded'
       });
     }
 
@@ -164,7 +173,7 @@ router.post('/file', upload.single('file'), (req, res) => {
 
     res.json({
       success: true,
-      message: '文件上传成功',
+      message: 'File uploaded successfully',
       fileUrl: fileUrl,
       fileInfo: {
         originalName: req.file.originalname,
@@ -178,18 +187,21 @@ router.post('/file', upload.single('file'), (req, res) => {
     console.error('File upload error:', error);
     res.status(500).json({
       success: false,
-      message: '上传失败'
+      message: 'Upload failed'
     });
   }
 });
 
-// 多文件上传
+/**
+ * Upload multiple files
+ * Handles multiple file uploads with automatic directory selection.
+ */
 router.post('/files', upload.array('files', 5), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
-        message: '没有上传文件'
+        message: 'No files uploaded'
       });
     }
 
@@ -210,7 +222,7 @@ router.post('/files', upload.array('files', 5), (req, res) => {
 
     res.json({
       success: true,
-      message: `成功上传 ${uploadedFiles.length} 个文件`,
+      message: `Successfully uploaded ${uploadedFiles.length} files`,
       files: uploadedFiles
     });
 
@@ -218,22 +230,25 @@ router.post('/files', upload.array('files', 5), (req, res) => {
     console.error('Multiple files upload error:', error);
     res.status(500).json({
       success: false,
-      message: '上传失败'
+      message: 'Upload failed'
     });
   }
 });
 
-// 删除文件
+/**
+ * Delete file
+ * Removes a file from the server with security checks.
+ */
 router.delete('/file/:filename', (req, res) => {
   try {
     const { filename } = req.params;
     const { type = 'files' } = req.query;
 
-    // 安全检查：防止路径遍历攻击
+    // Security check: prevent path traversal attacks
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({
         success: false,
-        message: '无效的文件名'
+        message: 'Invalid filename'
       });
     }
 
@@ -241,48 +256,51 @@ router.delete('/file/:filename', (req, res) => {
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({
         success: false,
-        message: '无效的文件类型'
+        message: 'Invalid file type'
       });
     }
 
     const filePath = path.join(__dirname, '..', 'uploads', type, filename);
 
-    // 检查文件是否存在
+    // Check if file exists
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         success: false,
-        message: '文件不存在'
+        message: 'File not found'
       });
     }
 
-    // 删除文件
+    // Delete file
     fs.unlinkSync(filePath);
 
     res.json({
       success: true,
-      message: '文件删除成功'
+      message: 'File deleted successfully'
     });
 
   } catch (error) {
     console.error('Delete file error:', error);
     res.status(500).json({
       success: false,
-      message: '删除失败'
+      message: 'Delete failed'
     });
   }
 });
 
-// 获取文件信息
+/**
+ * Get file information
+ * Returns metadata about a specific file.
+ */
 router.get('/file/:filename', (req, res) => {
   try {
     const { filename } = req.params;
     const { type = 'files' } = req.query;
 
-    // 安全检查
+    // Security check
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({
         success: false,
-        message: '无效的文件名'
+        message: 'Invalid filename'
       });
     }
 
@@ -290,17 +308,17 @@ router.get('/file/:filename', (req, res) => {
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({
         success: false,
-        message: '无效的文件类型'
+        message: 'Invalid file type'
       });
     }
 
     const filePath = path.join(__dirname, '..', 'uploads', type, filename);
 
-    // 检查文件是否存在
+    // Check if file exists
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         success: false,
-        message: '文件不存在'
+        message: 'File not found'
       });
     }
 
@@ -323,31 +341,31 @@ router.get('/file/:filename', (req, res) => {
     console.error('Get file info error:', error);
     res.status(500).json({
       success: false,
-      message: '获取文件信息失败'
+      message: 'Failed to get file information'
     });
   }
 });
 
-// 错误处理中间件
+// Error handling middleware
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
-        message: '文件大小超过限制'
+        message: 'File size exceeds limit'
       });
     }
     if (error.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({
         success: false,
-        message: '文件数量超过限制'
+        message: 'File count exceeds limit'
       });
     }
   }
 
   res.status(400).json({
     success: false,
-    message: error.message || '上传失败'
+    message: error.message || 'Upload failed'
   });
 });
 

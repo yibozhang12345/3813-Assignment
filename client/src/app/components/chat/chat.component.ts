@@ -20,13 +20,13 @@ import { Group, Channel, Message } from '../../models/group.model';
         <div class="sidebar-header">
           <h3>{{ currentGroup?.name || 'Loading Group...' }}</h3>
           <button class="btn btn-secondary btn-small" (click)="goBack()">
-            返回
+            Back
           </button>
         </div>
 
         <div class="channels-section">
           <div class="section-header">
-            <h4>频道</h4>
+            <h4>Channels</h4>
             <button
               *ngIf="canManageChannels()"
               class="btn btn-primary btn-small"
@@ -64,23 +64,23 @@ import { Group, Channel, Message } from '../../models/group.model';
         </div>
 
         <div class="members-section">
-          <h4>成员 ({{ getMemberCount() }})</h4>
+          <h4>Members ({{ getMemberCount() }})</h4>
           <div class="members-list">
              <div *ngFor="let member of currentGroup?.memberIds" class="member-item">
                {{ getMemberUsername(member) }}
-               <span *ngIf="isGroupAdmin(member)" class="admin-label">管理员</span>
+               <span *ngIf="isGroupAdmin(member)" class="admin-label">Admin</span>
              </div>
           </div>
         </div>
 
         <!-- Group Management for Admins -->
         <div *ngIf="canManageGroup()" class="group-management">
-          <h4>群组管理</h4>
+          <h4>Group Management</h4>
           <button class="btn btn-primary btn-small" (click)="showAddUser = true">
-            添加成员
+            Add Member
           </button>
           <button class="btn btn-danger btn-small" (click)="showManageMembers = true">
-            管理成员
+            Manage Members
           </button>
         </div>
       </div>
@@ -133,7 +133,7 @@ import { Group, Channel, Message } from '../../models/group.model';
                 type="text"
                 [(ngModel)]="newMessage"
                 name="newMessage"
-                placeholder="输入消息..."
+                placeholder="Type a message..."
                 class="message-input"
                 [disabled]="isUploading">
               <input
@@ -142,12 +142,12 @@ import { Group, Channel, Message } from '../../models/group.model';
                 accept="image/*"
                 (change)="onImageSelected($event)"
                 style="display: none">
-              <button type="button" class="btn-attachment" title="发送图片" (click)="triggerFileInput()" [disabled]="isUploading">
+              <button type="button" class="btn-attachment" title="Send Image" (click)="triggerFileInput()" [disabled]="isUploading">
                 📎
               </button>
             </div>
             <button type="submit" class="btn btn-primary" [disabled]="isUploading">
-              {{ isUploading ? '上传中...' : '发送' }}
+              {{ isUploading ? 'Uploading...' : 'Send' }}
             </button>
           </form>
         </div>
@@ -156,30 +156,30 @@ import { Group, Channel, Message } from '../../models/group.model';
       <!-- Create Channel Modal -->
       <div *ngIf="showCreateChannel" class="modal">
         <div class="modal-content">
-          <h3>创建新频道</h3>
+          <h3>Create New Channel</h3>
           <form (ngSubmit)="createChannel()">
             <div class="form-group">
-              <label>频道名称:</label>
+              <label>Channel Name:</label>
               <input
                 type="text"
                 [(ngModel)]="newChannelName"
                 name="channelName"
                 required
-                placeholder="请输入频道名称">
+                placeholder="Enter channel name">
             </div>
             <div class="form-group">
-              <label>频道描述:</label>
+              <label>Channel Description:</label>
               <input
                 type="text"
                 [(ngModel)]="newChannelDescription"
                 name="channelDescription"
-                placeholder="请输入频道描述（可选）">
+                placeholder="Enter channel description (optional)">
             </div>
             <div class="modal-actions">
               <button type="button" class="btn btn-secondary" (click)="cancelCreateChannel()">
-                取消
+                Cancel
               </button>
-              <button type="submit" class="btn btn-primary">创建</button>
+              <button type="submit" class="btn btn-primary">Create</button>
             </div>
           </form>
         </div>
@@ -188,20 +188,20 @@ import { Group, Channel, Message } from '../../models/group.model';
       <!-- Add User Modal -->
       <div *ngIf="showAddUser" class="modal">
         <div class="modal-content">
-          <h3>添加成员</h3>
+          <h3>Add Member</h3>
           <div class="users-to-add">
             <div *ngFor="let user of usersNotInGroup" class="user-option">
               <span>{{ user.username }} ({{ user.email }})</span>
               <button *ngIf="user._id || user.id" class="btn btn-primary btn-small" (click)="addUserToGroup(user._id || user.id!)">
-                添加
+                Add
               </button>
             </div>
             <div *ngIf="usersNotInGroup.length === 0" class="no-users">
-              没有可添加的用户
+              No users available to add
             </div>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-secondary" (click)="showAddUser = false">关闭</button>
+            <button class="btn btn-secondary" (click)="showAddUser = false">Close</button>
           </div>
         </div>
       </div>
@@ -209,12 +209,12 @@ import { Group, Channel, Message } from '../../models/group.model';
       <!-- Manage Members Modal -->
       <div *ngIf="showManageMembers" class="modal">
         <div class="modal-content">
-          <h3>管理成员</h3>
+          <h3>Manage Members</h3>
           <div class="members-management">
              <div *ngFor="let member of currentGroup?.memberIds" class="member-management-item">
                <div class="member-info">
                  <span>{{ getMemberUsername(member) }}</span>
-                 <span *ngIf="isGroupAdmin(member)" class="admin-label group-admin">群组管理员</span>
+                 <span *ngIf="isGroupAdmin(member)" class="admin-label group-admin">Group Admin</span>
                </div>
                <div class="member-actions">
                  <!-- Super Admin can promote/demote group admins -->
@@ -222,26 +222,26 @@ import { Group, Channel, Message } from '../../models/group.model';
                    *ngIf="authService.isSuperAdmin() && getMemberId(member) !== currentUser?.id && !isGroupAdmin(member)"
                    class="btn btn-success btn-small"
                    (click)="promoteToGroupAdmin(getMemberId(member))">
-                   提升为管理员
+                   Promote to Admin
                  </button>
                  <button
                    *ngIf="authService.isSuperAdmin() && getMemberId(member) !== currentUser?.id && isGroupAdmin(member)"
                    class="btn btn-warning btn-small"
                    (click)="demoteFromGroupAdmin(getMemberId(member))">
-                   撤销管理员
+                   Remove Admin
                  </button>
                  <!-- Regular remove member button -->
                  <button
                    *ngIf="getMemberId(member) !== currentUser?.id && !isGroupAdmin(member)"
                    class="btn btn-danger btn-small"
                    (click)="removeMember(getMemberId(member))">
-                   移除
+                   Remove
                  </button>
                </div>
              </div>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-secondary" (click)="showManageMembers = false">关闭</button>
+            <button class="btn btn-secondary" (click)="showManageMembers = false">Close</button>
           </div>
         </div>
       </div>
@@ -249,22 +249,22 @@ import { Group, Channel, Message } from '../../models/group.model';
       <!-- Manage Channel Members Modal -->
       <div *ngIf="showChannelMembersModal" class="modal">
         <div class="modal-content">
-          <h3>管理频道成员 - {{ selectedChannel?.name }}</h3>
+          <h3>Manage Channel Members - {{ selectedChannel?.name }}</h3>
           <div class="channel-members-management">
-            <h4>添加成员到频道</h4>
+            <h4>Add Members to Channel</h4>
             <div class="users-to-add">
               <div *ngFor="let user of usersNotInChannel" class="user-option">
                 <span>{{ getMemberUsername(user) }}</span>
                 <button *ngIf="user._id || user.id" class="btn btn-primary btn-small" (click)="addMemberToChannel(user._id || user.id!)">
-                  添加
+                  Add
                 </button>
               </div>
               <div *ngIf="usersNotInChannel.length === 0" class="no-users">
-                没有可添加的用户
+                No users available to add
               </div>
             </div>
 
-            <h4>频道成员</h4>
+            <h4>Channel Members</h4>
             <div class="channel-members-list">
               <div *ngFor="let member of selectedChannel?.memberIds" class="channel-member-item">
                 <span>{{ getMemberUsername(member) }}</span>
@@ -272,13 +272,13 @@ import { Group, Channel, Message } from '../../models/group.model';
                   *ngIf="canManageChannels() && getMemberId(member) !== currentUser?.id"
                   class="btn btn-danger btn-small"
                   (click)="removeMemberFromChannel(getMemberId(member))">
-                  移除
+                  Remove
                 </button>
               </div>
             </div>
           </div>
           <div class="modal-actions">
-            <button class="btn btn-secondary" (click)="showChannelMembersModal = false">关闭</button>
+            <button class="btn btn-secondary" (click)="showChannelMembersModal = false">Close</button>
           </div>
         </div>
       </div>
@@ -814,21 +814,21 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   setupSocketListeners(): void {
-    // 监听新消息
+    // Listen for new messages
     this.socketService.onMessageReceived((message: Message) => {
-      console.log('收到新消息:', message);
+      console.log('New message received:', message);
 
-      // 只有当消息属于当前频道时才添加到消息列表
+      // Only add message to list if it belongs to current channel
       if (this.currentChannel && message.channelId === (this.currentChannel.id || this.currentChannel._id)) {
         this.messages.push(message);
         setTimeout(() => this.scrollToBottom(), 100);
       }
     });
 
-    // 监听错误
+    // Listen for errors
     this.socketService.onError((error: any) => {
-      console.error('Socket错误:', error);
-      alert('连接错误: ' + error.message);
+      console.error('Socket error:', error);
+      alert('Connection error: ' + error.message);
     });
   }
 

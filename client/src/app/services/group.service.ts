@@ -102,7 +102,7 @@ export class GroupService {
       );
   }
 
-  // 发送图片消息
+  // Send image message
   sendImageMessage(groupId: string, channelId: string, imageUrl: string, fileSize: number, mimeType: string): Observable<Message> {
     const currentUser = this.authService.getCurrentUser();
     if (!currentUser) throw new Error('User not authenticated');
@@ -121,7 +121,7 @@ export class GroupService {
       );
   }
 
-  // 上传图片文件
+  // Upload image file
   uploadImage(file: File): Observable<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }> {
     const formData = new FormData();
     formData.append('image', file);
@@ -144,7 +144,7 @@ export class GroupService {
       );
   }
 
-  // 获取所有可申请的群组（用户未加入的群组）
+  // Get all available groups to apply for (groups user hasn't joined)
   getAvailableGroups(): Observable<Group[]> {
     return this.http.get<{ success: boolean; groups: Group[] }>(`${this.API_URL}/groups/available`)
       .pipe(
@@ -152,7 +152,7 @@ export class GroupService {
       );
   }
 
-  // 申请加入群组
+  // Apply to join group
   applyToGroup(groupId: string, message?: string): Observable<boolean> {
     const payload = { message: message || '' };
     return this.http.post<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/apply`, payload)
@@ -161,7 +161,7 @@ export class GroupService {
       );
   }
 
-  // 获取待审核的申请（管理员用）
+  // Get pending applications (for admins)
   getPendingApplications(groupId?: string): Observable<any[]> {
     const url = groupId
       ? `${this.API_URL}/groups/${groupId}/applications`
@@ -173,7 +173,7 @@ export class GroupService {
       );
   }
 
-  // 审核申请
+  // Review application
   reviewApplication(applicationId: string, action: 'approve' | 'reject', message?: string): Observable<boolean> {
     const payload = { action, message: message || '' };
     return this.http.post<{ success: boolean; message: string }>(`${this.API_URL}/groups/applications/${applicationId}/review`, payload)
@@ -182,7 +182,7 @@ export class GroupService {
       );
   }
 
-  // 管理员创建用户
+  // Admin create user
   createUser(userData: { username: string; email: string; password: string; roles?: string[] }): Observable<any> {
     return this.http.post<{ success: boolean; user: any }>(`${this.API_URL}/auth/admin/create-user`, userData)
       .pipe(
@@ -190,32 +190,32 @@ export class GroupService {
       );
   }
 
-  // 提升用户为群组管理员（仅限超级管理员）
+  // Promote user to group admin (super admin only)
   promoteUserToGroupAdmin(groupId: string, userId: string): Observable<{ success: boolean; message: string }> {
     return this.http.put<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/members/${userId}/promote`, {});
   }
 
-  // 撤销用户的群组管理员权限（仅限超级管理员）
+  // Demote user from group admin (super admin only)
   demoteUserFromGroupAdmin(groupId: string, userId: string): Observable<{ success: boolean; message: string }> {
     return this.http.put<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/members/${userId}/demote`, {});
   }
 
-  // 删除频道
+  // Delete channel
   deleteChannel(groupId: string, channelId: string): Observable<{ success: boolean; message: string }> {
     return this.http.delete<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}`);
   }
 
-  // 添加成员到频道
+  // Add member to channel
   addMemberToChannel(groupId: string, channelId: string, userId: string): Observable<{ success: boolean; message: string }> {
     return this.http.post<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}/members`, { userId });
   }
 
-  // 从频道移除成员
+  // Remove member from channel
   removeMemberFromChannel(groupId: string, channelId: string, userId: string): Observable<{ success: boolean; message: string }> {
     return this.http.delete<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}/channels/${channelId}/members/${userId}`);
   }
 
-  // 删除群组
+  // Delete group
   deleteGroup(groupId: string): Observable<{ success: boolean; message: string }> {
     return this.http.delete<{ success: boolean; message: string }>(`${this.API_URL}/groups/${groupId}`);
   }

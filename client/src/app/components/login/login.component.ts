@@ -12,11 +12,11 @@ import { LoginRequest } from '../../models/user.model';
   template: `
     <div class="login-container">
       <div class="login-form">
-        <h2>聊天系统登录</h2>
+        <h2>Chat System Login</h2>
 
         <form (ngSubmit)="onLogin()" #loginForm="ngForm">
           <div class="form-group">
-            <label for="username">用户名:</label>
+            <label for="username">Username:</label>
             <input
               type="text"
               id="username"
@@ -24,14 +24,14 @@ import { LoginRequest } from '../../models/user.model';
               [(ngModel)]="credentials.username"
               required
               #username="ngModel"
-              placeholder="请输入用户名">
+              placeholder="Please enter username">
             <div *ngIf="username.invalid && username.touched" class="error">
-              用户名不能为空
+              Username cannot be empty
             </div>
           </div>
 
           <div class="form-group">
-            <label for="password">密码:</label>
+            <label for="password">Password:</label>
             <input
               type="password"
               id="password"
@@ -39,9 +39,9 @@ import { LoginRequest } from '../../models/user.model';
               [(ngModel)]="credentials.password"
               required
               #password="ngModel"
-              placeholder="请输入密码">
+              placeholder="Please enter password">
             <div *ngIf="password.invalid && password.touched" class="error">
-              密码不能为空
+              Password cannot be empty
             </div>
           </div>
 
@@ -53,55 +53,55 @@ import { LoginRequest } from '../../models/user.model';
             type="submit"
             class="btn btn-primary"
             [disabled]="!loginForm.form.valid || isLoading">
-            {{ isLoading ? '登录中...' : '登录' }}
+            {{ isLoading ? 'Logging in...' : 'Login' }}
           </button>
         </form>
 
         <div class="login-help">
-          <p>默认超级管理员账户：</p>
-          <p>用户名: super, 密码: 123</p>
+          <p>Default super administrator account:</p>
+          <p>Username: super, Password: 123</p>
           <button class="btn btn-secondary" (click)="showRegister = !showRegister">
-            {{ showRegister ? '返回登录' : '注册新用户' }}
+            {{ showRegister ? 'Back to Login' : 'Register New User' }}
           </button>
         </div>
 
         <div *ngIf="showRegister" class="register-form">
-          <h3>注册新用户</h3>
+          <h3>Register New User</h3>
           <form (ngSubmit)="onRegister()" #registerForm="ngForm">
             <div class="form-group">
-              <label for="newUsername">用户名:</label>
+              <label for="newUsername">Username:</label>
               <input
                 type="text"
                 id="newUsername"
                 name="newUsername"
                 [(ngModel)]="newUser.username"
                 required
-                placeholder="请输入用户名">
+                placeholder="Please enter username">
             </div>
 
             <div class="form-group">
-              <label for="email">邮箱:</label>
+              <label for="email">Email:</label>
               <input
                 type="email"
                 id="email"
                 name="email"
                 [(ngModel)]="newUser.email"
                 required
-                placeholder="请输入邮箱">
+                placeholder="Please enter email">
             </div>
 
             <div class="form-group">
-              <label for="newPassword">密码:</label>
+              <label for="newPassword">Password:</label>
               <input
                 type="password"
                 id="newPassword"
                 name="newPassword"
                 [(ngModel)]="newUser.password"
                 required
-                placeholder="请输入密码(至少6位)">
+                placeholder="Please enter password (at least 6 characters)">
             </div>
 
-            <button type="submit" class="btn btn-primary">注册</button>
+            <button type="submit" class="btn btn-primary">Register</button>
           </form>
         </div>
       </div>
@@ -188,7 +188,7 @@ export class LoginComponent {
 
   onLogin(): void {
     if (!this.credentials.username || !this.credentials.password) {
-      this.errorMessage = '请填写用户名和密码';
+      this.errorMessage = 'Please fill in username and password';
       return;
     }
 
@@ -201,12 +201,12 @@ export class LoginComponent {
         if (response.success) {
           this.router.navigate(['/dashboard']);
         } else {
-          this.errorMessage = response.message || '登录失败';
+          this.errorMessage = response.message || 'Login failed';
         }
       },
       error: (error) => {
         this.isLoading = false;
-        this.errorMessage = '登录失败，请重试';
+        this.errorMessage = 'Login failed, please try again';
         console.error('Login error:', error);
       }
     });
@@ -214,25 +214,25 @@ export class LoginComponent {
 
   onRegister(): void {
     if (!this.newUser.username || !this.newUser.email || !this.newUser.password) {
-      this.errorMessage = '请填写所有注册信息';
+      this.errorMessage = 'Please fill in all registration information';
       return;
     }
 
     if (this.newUser.password.length < 6) {
-      this.errorMessage = '密码至少需要6位字符';
+      this.errorMessage = 'Password needs at least 6 characters';
       return;
     }
 
     this.authService.registerUser(this.newUser).subscribe({
       next: (response) => {
         if (response.success) {
-          alert('注册成功！请使用新账户登录。');
+          alert('Registration successful! Please login with your new account.');
           this.showRegister = false;
           this.newUser = { username: '', email: '', password: '' };
         }
       },
       error: (error) => {
-        this.errorMessage = '注册失败，请重试';
+        this.errorMessage = 'Registration failed, please try again';
         console.error('Register error:', error);
       }
     });

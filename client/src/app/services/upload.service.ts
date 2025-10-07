@@ -30,7 +30,7 @@ export class UploadService {
 
   constructor(private http: HttpClient) {}
 
-  // 上传头像
+  // Upload avatar
   uploadAvatar(file: File): Observable<UploadProgress> {
     const formData = new FormData();
     formData.append('avatar', file);
@@ -38,7 +38,7 @@ export class UploadService {
     return this.uploadWithProgress(`${this.API_URL}/avatar`, formData);
   }
 
-  // 上传聊天图片
+  // Upload chat image
   uploadImage(file: File): Observable<UploadProgress> {
     const formData = new FormData();
     formData.append('image', file);
@@ -46,7 +46,7 @@ export class UploadService {
     return this.uploadWithProgress(`${this.API_URL}/image`, formData);
   }
 
-  // 上传文件
+  // Upload file
   uploadFile(file: File): Observable<UploadProgress> {
     const formData = new FormData();
     formData.append('file', file);
@@ -54,7 +54,7 @@ export class UploadService {
     return this.uploadWithProgress(`${this.API_URL}/file`, formData);
   }
 
-  // 上传多个文件
+  // Upload multiple files
   uploadFiles(files: File[]): Observable<UploadProgress> {
     const formData = new FormData();
     files.forEach(file => {
@@ -64,7 +64,7 @@ export class UploadService {
     return this.uploadWithProgress(`${this.API_URL}/files`, formData);
   }
 
-  // 通用上传方法（带进度）
+  // Generic upload method (with progress)
   private uploadWithProgress(url: string, formData: FormData): Observable<UploadProgress> {
     const req = new HttpRequest('POST', url, formData, {
       reportProgress: true,
@@ -98,17 +98,17 @@ export class UploadService {
     );
   }
 
-  // 删除文件
+  // Delete file
   deleteFile(filename: string, type: 'files' | 'images' | 'avatars' = 'files'): Observable<any> {
     return this.http.delete(`${this.API_URL}/file/${filename}?type=${type}`);
   }
 
-  // 获取文件信息
+  // Get file information
   getFileInfo(filename: string, type: 'files' | 'images' | 'avatars' = 'files'): Observable<any> {
     return this.http.get(`${this.API_URL}/file/${filename}?type=${type}`);
   }
 
-  // 文件类型验证
+  // File type validation
   isValidImageFile(file: File): boolean {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     return validTypes.includes(file.type);
@@ -120,7 +120,7 @@ export class UploadService {
     return validTypes.includes(file.type) && file.size <= maxSize;
   }
 
-  // 获取文件大小的人类可读格式
+  // Get human readable file size format
   formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
 
@@ -131,7 +131,7 @@ export class UploadService {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
-  // 图片预览
+  // Image preview
   createImagePreview(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

@@ -19,7 +19,7 @@ export class SocketService {
 
     const currentUser = this.authService.getCurrentUser();
     if (!currentUser) {
-      console.error('用户未登录，无法连接到Socket.IO');
+      console.error('User not logged in, cannot connect to Socket.IO');
       return;
     }
 
@@ -30,15 +30,15 @@ export class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket.IO连接成功:', this.socket?.id);
+      console.log('Socket.IO connected successfully:', this.socket?.id);
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('Socket.IO连接错误:', error);
+      console.error('Socket.IO connection error:', error);
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Socket.IO断开连接:', reason);
+      console.log('Socket.IO disconnected:', reason);
     });
   }
 
@@ -51,14 +51,14 @@ export class SocketService {
 
   joinChannel(channelId: string): void {
     if (!this.socket) {
-      console.error('Socket未连接');
+      console.error('Socket not connected');
       return;
     }
 
     const currentUser = this.authService.getCurrentUser();
     console.log('Joining channel with currentUser:', currentUser);
     if (!currentUser) {
-      console.error('用户未登录');
+      console.error('User not logged in');
       return;
     }
 
@@ -73,18 +73,18 @@ export class SocketService {
         roles: currentUser.roles
       }
     });
-    console.log('加入频道:', channelId);
+    console.log('Joined channel:', channelId);
   }
 
   leaveChannel(channelId: string): void {
     if (!this.socket) {
-      console.error('Socket未连接');
+      console.error('Socket not connected');
       return;
     }
 
     const currentUser = this.authService.getCurrentUser();
     if (!currentUser) {
-      console.error('用户未登录');
+      console.error('User not logged in');
       return;
     }
 
@@ -96,19 +96,19 @@ export class SocketService {
         roles: currentUser.roles
       }
     });
-    console.log('离开频道:', channelId);
+    console.log('Left channel:', channelId);
   }
 
   sendMessage(channelId: string, message: string, type: 'text' | 'image' | 'file' = 'text', fileUrl?: string, fileSize?: number, mimeType?: string): void {
     if (!this.socket) {
-      console.error('Socket未连接');
+      console.error('Socket not connected');
       return;
     }
 
     const currentUser = this.authService.getCurrentUser();
     console.log('Sending message with currentUser:', currentUser);
     if (!currentUser) {
-      console.error('用户未登录');
+      console.error('User not logged in');
       return;
     }
 
@@ -132,14 +132,14 @@ export class SocketService {
 
   onMessageReceived(callback: (message: Message) => void): void {
     if (!this.socket) {
-      console.error('Socket未连接');
+      console.error('Socket not connected');
       return;
     }
 
     this.socket.on('receive-message', (data: any) => {
-      console.log('收到消息:', data);
+      console.log('Message received:', data);
 
-      // 转换为Message对象
+      // Convert to Message object
       const message: Message = {
         id: data.id,
         content: data.content,

@@ -7,10 +7,14 @@ const mongoose = require('mongoose');
 
 class MongoDataStore {
   constructor() {
-    // 初始化时确保默认超级管理员存在
+    // Ensure default super admin exists during initialization
     this.initializeDefaultUser();
   }
 
+  /**
+   * Initialize default user
+   * Creates a default super admin user if it doesn't exist.
+   */
   async initializeDefaultUser() {
     try {
       const existingSuperAdmin = await User.findOne({ username: 'super' });
@@ -22,51 +26,75 @@ class MongoDataStore {
           roles: ['super-admin']
         });
         await superAdmin.save();
-        console.log('✅ 默认超级管理员已创建 (用户名: super, 密码: 123456)');
+        console.log('✅ Default super admin created (username: super, password: 123456)');
       }
     } catch (error) {
-      console.error('❌ 创建默认用户失败:', error);
+      console.error('❌ Failed to create default user:', error);
     }
   }
 
-  // 用户管理方法
+  // User management methods
+
+  /**
+   * Get all users
+   * Returns a list of all users without passwords.
+   */
   async getUsers() {
     try {
       return await User.find().select('-password');
     } catch (error) {
-      console.error('获取用户列表失败:', error);
+      console.error('Failed to get user list:', error);
       throw error;
     }
   }
 
+  /**
+   * Add new user
+   * Creates a new user with the provided data.
+   * @param {Object} userData - User data to create
+   */
   async addUser(userData) {
     try {
       const user = new User(userData);
       return await user.save();
     } catch (error) {
-      console.error('创建用户失败:', error);
+      console.error('Failed to create user:', error);
       throw error;
     }
   }
 
+  /**
+   * Find user by username
+   * @param {string} username - Username to search for
+   */
   async findUserByUsername(username) {
     try {
       return await User.findOne({ username });
     } catch (error) {
-      console.error('查找用户失败:', error);
+      console.error('Failed to find user:', error);
       throw error;
     }
   }
 
+  /**
+   * Find user by ID
+   * @param {string} id - User ID to search for
+   */
   async findUserById(id) {
     try {
       return await User.findById(id).select('-password');
     } catch (error) {
-      console.error('根据ID查找用户失败:', error);
+      console.error('Failed to find user by ID:', error);
       throw error;
     }
   }
 
+  /**
+   * Update user
+   * Updates user information and sets updated timestamp.
+   * @param {string} userId - User ID to update
+   * @param {Object} updates - Fields to update
+   */
   async updateUser(userId, updates) {
     try {
       return await User.findByIdAndUpdate(
@@ -75,16 +103,21 @@ class MongoDataStore {
         { new: true, runValidators: true }
       ).select('-password');
     } catch (error) {
-      console.error('更新用户失败:', error);
+      console.error('Failed to update user:', error);
       throw error;
     }
   }
 
+  /**
+   * Delete user
+   * Removes a user and cleans up all related data.
+   * @param {string} userId - User ID to delete
+   */
   async deleteUser(userId) {
     try {
       const result = await User.findByIdAndDelete(userId);
       if (result) {
-        // 从所有群组中移除该用户
+        // Remove user from all groups
         await Group.updateMany(
           {},
           {
@@ -95,25 +128,30 @@ class MongoDataStore {
           }
         );
 
-        // 从所有频道中移除该用户
+        // Remove user from all channels
         await Channel.updateMany(
           {},
           { $pull: { memberIds: userId } }
         );
 
-        // 删除该用户的所有群组申请记录
+        // Delete all group applications for this user
         await GroupApplication.deleteMany({ userId: userId });
 
         return true;
       }
       return false;
     } catch (error) {
-      console.error('删除用户失败:', error);
+      console.error('Failed to delete user:', error);
       throw error;
     }
   }
 
-  // 群组管理方法
+  // Group management methods
+
+  /**
+   * Get all groups
+   * Returns all groups with populated admin and member information.
+   */
   async getGroups() {
     try {
       return await Group.find()
@@ -121,25 +159,35 @@ class MongoDataStore {
         .populate('memberIds', 'username email avatar')
         .populate('createdBy', 'username email');
     } catch (error) {
-      console.error('获取群组列表失败:', error);
+      console.error('Failed to get group list:', error);
       throw error;
     }
   }
 
+  /**
+   * Get user's groups
+   * Returns all groups where the user is a member or admin.
+   * @param {string} userId - User ID
+   */
   async getUserGroups(userId) {
     try {
       return await Group.getUserGroups(userId);
     } catch (error) {
-      console.error('获取用户群组失败:', error);
+      console.error('Failed to get user groups:', error);
       throw error;
     }
   }
 
+  /**
+   * Add new group
+   * Creates a new group and automatically adds creator as admin and member.
+   * @param {Object} groupData - Group data to create
+   */
   async addGroup(groupData) {
     try {
       const group = new Group(groupData);
 
-      // 创建者自动成为管理员和成员
+      // Creator automatically becomes admin and member
       if (!group.adminIds.includes(groupData.createdBy)) {
         group.adminIds.push(groupData.createdBy);
       }
@@ -149,10 +197,10 @@ class MongoDataStore {
 
       const savedGroup = await group.save();
 
-      // 创建默认的 general 频道
+      // Create default 'general' channel
       const defaultChannel = new Channel({
         name: 'general',
-        description: '默认频道',
+        description: 'Default channel',
         groupId: savedGroup._id,
         memberIds: [...savedGroup.memberIds],
         createdBy: groupData.createdBy
@@ -164,22 +212,32 @@ class MongoDataStore {
         .populate('adminIds', 'username email avatar')
         .populate('memberIds', 'username email avatar');
     } catch (error) {
-      console.error('创建群组失败:', error);
+      console.error('Failed to create group:', error);
       throw error;
     }
   }
 
+  /**
+   * Find group by ID
+   * @param {string} id - Group ID to search for
+   */
   async findGroupById(id) {
     try {
       return await Group.findById(id)
         .populate('adminIds', 'username email avatar')
         .populate('memberIds', 'username email avatar');
     } catch (error) {
-      console.error('查找群组失败:', error);
+      console.error('Failed to find group:', error);
       throw error;
     }
   }
 
+  /**
+   * Update group
+   * Updates group information and sets updated timestamp.
+   * @param {string} groupId - Group ID to update
+   * @param {Object} updates - Fields to update
+   */
   async updateGroup(groupId, updates) {
     try {
       return await Group.findByIdAndUpdate(
@@ -188,40 +246,51 @@ class MongoDataStore {
         { new: true, runValidators: true }
       ).populate('adminIds memberIds', 'username email avatar');
     } catch (error) {
-      console.error('更新群组失败:', error);
+      console.error('Failed to update group:', error);
       throw error;
     }
   }
 
+  /**
+   * Delete group
+   * Removes a group and all associated channels and messages.
+   * @param {string} groupId - Group ID to delete
+   */
   async deleteGroup(groupId) {
     try {
-      // 获取群组信息
+      // Get group information
       const group = await Group.findById(groupId);
       if (!group) return false;
 
-      // 删除群组的所有频道和相关消息
+      // Delete all channels and related messages in the group
       const channels = await Channel.find({ groupId: groupId });
       for (const channel of channels) {
-        // 删除频道中的所有消息
+        // Delete all messages in the channel
         await Message.deleteMany({ channelId: channel._id });
       }
 
-      // 删除所有频道
+      // Delete all channels
       await Channel.deleteMany({ groupId: groupId });
 
-      // 删除群组申请记录
+      // Delete group application records
       await GroupApplication.deleteMany({ groupId: groupId });
 
-      // 删除群组
+      // Delete group
       const result = await Group.findByIdAndDelete(groupId);
 
       return !!result;
     } catch (error) {
-      console.error('删除群组失败:', error);
+      console.error('Failed to delete group:', error);
       throw error;
     }
   }
 
+  /**
+   * Add user to group
+   * Adds a user as a member to a group and all its channels.
+   * @param {string} groupId - Group ID
+   * @param {string} userId - User ID to add
+   */
   async addUserToGroup(groupId, userId) {
     try {
       const group = await Group.findById(groupId);
@@ -229,7 +298,7 @@ class MongoDataStore {
 
       const success = await group.addMember(userId);
 
-      // 将用户添加到群组的所有频道
+      // Add user to all channels in the group
       await Channel.updateMany(
         { groupId: groupId },
         { $addToSet: { memberIds: userId } }
@@ -237,11 +306,17 @@ class MongoDataStore {
 
       return !!success;
     } catch (error) {
-      console.error('添加用户到群组失败:', error);
+      console.error('Failed to add user to group:', error);
       throw error;
     }
   }
 
+  /**
+   * Remove user from group
+   * Removes a user from a group and all its channels.
+   * @param {string} groupId - Group ID
+   * @param {string} userId - User ID to remove
+   */
   async removeUserFromGroup(groupId, userId) {
     try {
       const group = await Group.findById(groupId);
@@ -249,7 +324,7 @@ class MongoDataStore {
 
       const success = await group.removeMember(userId);
 
-      // 从群组的所有频道中移除用户
+      // Remove user from all channels in the group
       await Channel.updateMany(
         { groupId: groupId },
         { $pull: { memberIds: userId } }
@@ -257,71 +332,95 @@ class MongoDataStore {
 
       return !!success;
     } catch (error) {
-      console.error('从群组移除用户失败:', error);
+      console.error('Failed to remove user from group:', error);
       throw error;
     }
   }
 
+  /**
+   * Promote user to group admin
+   * Grants admin privileges to a user in a group.
+   * @param {string} groupId - Group ID
+   * @param {string} userId - User ID to promote
+   */
   async promoteUserToGroupAdmin(groupId, userId) {
     try {
       const group = await Group.findById(groupId);
       if (!group) return false;
 
-      // 检查用户是否已经是管理员
+      // Check if user is already an admin
       if (group.adminIds.includes(userId)) {
         return false;
       }
 
-      // 检查用户是否是成员
+      // Check if user is a member
       if (!group.memberIds.includes(userId)) {
         return false;
       }
 
-      // 将用户添加到管理员列表
+      // Add user to admin list
       group.adminIds.push(userId);
       await group.save();
 
       return true;
     } catch (error) {
-      console.error('提升用户为群组管理员失败:', error);
+      console.error('Failed to promote user to group admin:', error);
       throw error;
     }
   }
 
+  /**
+   * Demote user from group admin
+   * Removes admin privileges from a user in a group.
+   * @param {string} groupId - Group ID
+   * @param {string} userId - User ID to demote
+   */
   async demoteUserFromGroupAdmin(groupId, userId) {
     try {
       const group = await Group.findById(groupId);
       if (!group) return false;
 
-      // 检查用户是否是管理员
+      // Check if user is an admin
       if (!group.adminIds.includes(userId)) {
         return false;
       }
 
-      // 从管理员列表中移除用户（用户仍然保持成员身份）
+      // Remove user from admin list (user remains a member)
       group.adminIds = group.adminIds.filter(adminId => adminId.toString() !== userId.toString());
       await group.save();
 
       return true;
     } catch (error) {
-      console.error('撤销群组管理员权限失败:', error);
+      console.error('Failed to demote user from group admin:', error);
       throw error;
     }
   }
 
-  // 频道管理方法
+  // Channel management methods
+
+  /**
+   * Get group channels
+   * Returns all channels for a specific group.
+   * @param {string} groupId - Group ID
+   */
   async getGroupChannels(groupId) {
     try {
       return await Channel.getGroupChannels(groupId);
     } catch (error) {
-      console.error('获取群组频道失败:', error);
+      console.error('Failed to get group channels:', error);
       throw error;
     }
   }
 
+  /**
+   * Add channel to group
+   * Creates a new channel within a group.
+   * @param {string} groupId - Group ID
+   * @param {Object} channelData - Channel data to create
+   */
   async addChannelToGroup(groupId, channelData) {
     try {
-      // 获取群组成员列表
+      // Get group member list
       const group = await Group.findById(groupId);
       if (!group) return null;
 
@@ -333,54 +432,75 @@ class MongoDataStore {
 
       return await channel.save();
     } catch (error) {
-      console.error('创建频道失败:', error);
+      console.error('Failed to create channel:', error);
       throw error;
     }
   }
 
+  /**
+   * Find channel by ID
+   * @param {string} channelId - Channel ID to search for
+   */
   async findChannelById(channelId) {
     try {
       return await Channel.findById(channelId)
         .populate('memberIds', 'username email avatar')
         .populate('groupId', 'name');
     } catch (error) {
-      console.error('查找频道失败:', error);
+      console.error('Failed to find channel:', error);
       throw error;
     }
   }
 
+  /**
+   * Delete channel
+   * Removes a channel and all its messages.
+   * @param {string} channelId - Channel ID to delete
+   */
   async deleteChannel(channelId) {
     try {
-      // 删除频道中的所有消息
+      // Delete all messages in the channel
       await Message.deleteMany({ channelId: channelId });
 
-      // 删除频道
+      // Delete channel
       const result = await Channel.findByIdAndDelete(channelId);
 
       return !!result;
     } catch (error) {
-      console.error('删除频道失败:', error);
+      console.error('Failed to delete channel:', error);
       throw error;
     }
   }
 
-  // 消息管理方法
+  // Message management methods
+
+  /**
+   * Get channel messages
+   * Returns messages for a specific channel with pagination options.
+   * @param {string} channelId - Channel ID
+   * @param {Object} options - Pagination and filtering options
+   */
   async getChannelMessages(channelId, options = {}) {
     try {
       const messages = await Message.getChannelMessages(channelId, options);
-      return messages.reverse(); // 返回时间正序
+      return messages.reverse(); // Return in chronological order
     } catch (error) {
-      console.error('获取频道消息失败:', error);
+      console.error('Failed to get channel messages:', error);
       throw error;
     }
   }
 
+  /**
+   * Add message
+   * Creates a new message and updates channel activity.
+   * @param {Object} messageData - Message data to create
+   */
   async addMessage(messageData) {
     try {
       const message = new Message(messageData);
       const savedMessage = await message.save();
 
-      // 更新频道的最后活动时间
+      // Update channel's last activity time
       await Channel.findByIdAndUpdate(
         messageData.channelId,
         { lastActivity: new Date() }
@@ -389,11 +509,17 @@ class MongoDataStore {
       return await Message.findById(savedMessage._id)
         .populate('senderId', 'username avatar');
     } catch (error) {
-      console.error('创建消息失败:', error);
+      console.error('Failed to create message:', error);
       throw error;
     }
   }
 
+  /**
+   * Update message
+   * Edits the content of an existing message.
+   * @param {string} messageId - Message ID to update
+   * @param {string} content - New message content
+   */
   async updateMessage(messageId, content) {
     try {
       const message = await Message.findById(messageId);
@@ -401,21 +527,33 @@ class MongoDataStore {
 
       return await message.editMessage(content);
     } catch (error) {
-      console.error('更新消息失败:', error);
+      console.error('Failed to update message:', error);
       throw error;
     }
   }
 
+  /**
+   * Delete message
+   * Removes a message from the database.
+   * @param {string} messageId - Message ID to delete
+   */
   async deleteMessage(messageId) {
     try {
       return await Message.findByIdAndDelete(messageId);
     } catch (error) {
-      console.error('删除消息失败:', error);
+      console.error('Failed to delete message:', error);
       throw error;
     }
   }
 
-  // 用户在线状态管理
+  // User online status management
+
+  /**
+   * Set user online status
+   * Updates a user's online status and last seen time.
+   * @param {string} userId - User ID
+   * @param {boolean} isOnline - Online status
+   */
   async setUserOnline(userId, isOnline = true) {
     try {
       return await User.findByIdAndUpdate(
@@ -427,22 +565,28 @@ class MongoDataStore {
         { new: true }
       ).select('-password');
     } catch (error) {
-      console.error('更新用户在线状态失败:', error);
+      console.error('Failed to update user online status:', error);
       throw error;
     }
   }
 
-  // 获取在线用户
+  /**
+   * Get online users
+   * Returns all users who are currently online.
+   */
   async getOnlineUsers() {
     try {
       return await User.find({ isOnline: true }).select('username avatar');
     } catch (error) {
-      console.error('获取在线用户失败:', error);
+      console.error('Failed to get online users:', error);
       throw error;
     }
   }
 
-  // 健康检查
+  /**
+   * Health check
+   * Performs a health check on the database and returns statistics.
+   */
   async healthCheck() {
     try {
       const userCount = await User.countDocuments();
@@ -467,10 +611,16 @@ class MongoDataStore {
     }
   }
 
-  // 群组申请管理方法
+  // Group application management methods
+
+  /**
+   * Get available groups for application
+   * Returns groups that a user has not joined and can apply to.
+   * @param {string} userId - User ID
+   */
   async getAvailableGroups(userId) {
     try {
-      // 获取用户未加入的群组
+      // Get groups the user has not joined
       const groups = await Group.find({
         $and: [
           { memberIds: { $ne: userId } },
@@ -478,23 +628,28 @@ class MongoDataStore {
         ]
       }).populate('adminIds memberIds', 'username email avatar');
 
-      // 为每个群组获取频道数量
+      // Get channel count for each group
       const GroupsWithChannelCount = await Promise.all(
         groups.map(async (group) => {
           const channelCount = await Channel.countDocuments({ groupId: group._id });
           const groupObj = group.toObject();
-          groupObj.channels = [{ id: 'general', name: 'general' }]; // 模拟默认频道
+          groupObj.channels = [{ id: 'general', name: 'general' }]; // Simulate default channel
           return groupObj;
         })
       );
 
       return GroupsWithChannelCount;
     } catch (error) {
-      console.error('获取可申请群组失败:', error);
+      console.error('Failed to get available groups:', error);
       throw error;
     }
   }
 
+  /**
+   * Create group application
+   * Submits an application for a user to join a group.
+   * @param {Object} applicationData - Application data
+   */
   async createGroupApplication(applicationData) {
     try {
       const existingApplication = await GroupApplication.findOne({
@@ -504,17 +659,22 @@ class MongoDataStore {
       });
 
       if (existingApplication) {
-        throw new Error('已有待审核的申请');
+        throw new Error('You already have a pending application');
       }
 
       const application = new GroupApplication(applicationData);
       return await application.save();
     } catch (error) {
-      console.error('创建群组申请失败:', error);
+      console.error('Failed to create group application:', error);
       throw error;
     }
   }
 
+  /**
+   * Get pending applications
+   * Returns pending applications for a specific group or all groups.
+   * @param {string} groupId - Optional group ID filter
+   */
   async getPendingApplications(groupId = null) {
     try {
       if (groupId) {
@@ -523,20 +683,26 @@ class MongoDataStore {
         return await GroupApplication.getAllPendingApplications();
       }
     } catch (error) {
-      console.error('获取待审核申请失败:', error);
+      console.error('Failed to get pending applications:', error);
       throw error;
     }
   }
 
+  /**
+   * Review group application
+   * Approves or rejects a group join application.
+   * @param {string} applicationId - Application ID
+   * @param {Object} reviewData - Review data with action and message
+   */
   async reviewGroupApplication(applicationId, reviewData) {
     try {
       const application = await GroupApplication.findById(applicationId);
       if (!application) {
-        throw new Error('申请不存在');
+        throw new Error('Application does not exist');
       }
 
       if (application.status !== 'pending') {
-        throw new Error('申请已被处理');
+        throw new Error('Application already processed');
       }
 
       application.status = reviewData.action === 'approve' ? 'approved' : 'rejected';
@@ -552,21 +718,30 @@ class MongoDataStore {
 
       return application;
     } catch (error) {
-      console.error('审核群组申请失败:', error);
+      console.error('Failed to review group application:', error);
       throw error;
     }
   }
 
+  /**
+   * Get user applications
+   * Returns all applications submitted by a specific user.
+   * @param {string} userId - User ID
+   */
   async getUserApplications(userId) {
     try {
       return await GroupApplication.getUserApplications(userId);
     } catch (error) {
-      console.error('获取用户申请记录失败:', error);
+      console.error('Failed to get user applications:', error);
       throw error;
     }
   }
 
-  // 管理员创建用户
+  /**
+   * Create user by admin
+   * Allows administrators to create new users.
+   * @param {Object} userData - User data to create
+   */
   async createUserByAdmin(userData) {
     try {
       const existingUser = await User.findOne({
@@ -577,7 +752,7 @@ class MongoDataStore {
       });
 
       if (existingUser) {
-        throw new Error('用户名或邮箱已存在');
+        throw new Error('Username or email already exists');
       }
 
       const user = new User({
@@ -587,7 +762,7 @@ class MongoDataStore {
 
       return await user.save();
     } catch (error) {
-      console.error('管理员创建用户失败:', error);
+      console.error('Failed to create user by admin:', error);
       throw error;
     }
   }

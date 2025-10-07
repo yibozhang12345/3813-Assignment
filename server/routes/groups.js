@@ -8,7 +8,7 @@ function hasPermission(user, group, action) {
     case 'manage':
       if (user.roles.includes('super-admin')) return true;
 
-      // 检查用户是否是群组管理员（考虑populate后的对象格式）
+      // Check if user is a group admin (considering populated object format)
       return group.adminIds.some(admin => {
         const adminId = admin._id ? admin._id.toString() : admin.toString();
         return adminId === user.id.toString();
@@ -17,7 +17,7 @@ function hasPermission(user, group, action) {
     case 'view':
       if (user.roles.includes('super-admin')) return true;
 
-      // 检查用户是否是群组成员或管理员（考虑populate后的对象格式）
+      // Check if user is a group member or admin (considering populated object format)
       const isMember = group.memberIds.some(member => {
         const memberId = member._id ? member._id.toString() : member.toString();
         return memberId === user.id.toString();
@@ -37,7 +37,10 @@ function hasPermission(user, group, action) {
 
 // STATIC ROUTES FIRST (no parameters)
 
-// 获取可申请的群组（用户未加入的群组）
+/**
+ * Get groups available for application (groups the user has not joined)
+ * Returns a list of groups the user can apply to join.
+ */
 router.get('/available', async (req, res) => {
   try {
     const availableGroups = await dataStore.getAvailableGroups(req.user.id);
@@ -50,18 +53,21 @@ router.get('/available', async (req, res) => {
     console.error('Get available groups error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 获取所有待审核申请（超级管理员用）
+/**
+ * Get all pending group join applications (super admin only)
+ * Returns all pending applications for group membership.
+ */
 router.get('/applications', async (req, res) => {
   try {
     if (!req.user.roles.includes('super-admin')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足，需要超级管理员权限'
+        message: 'Insufficient permissions, super admin required'
       });
     }
 
@@ -75,12 +81,17 @@ router.get('/applications', async (req, res) => {
     console.error('Get all applications error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 审核申请
+/**
+ * Review a group join application (approve or reject)
+ * @param {string} applicationId - The application ID
+ * @param {string} action - 'approve' or 'reject'
+ * @param {string} message - Optional review message
+ */
 router.post('/applications/:applicationId/review', async (req, res) => {
   try {
     const { applicationId } = req.params;
@@ -89,7 +100,7 @@ router.post('/applications/:applicationId/review', async (req, res) => {
     if (!['approve', 'reject'].includes(action)) {
       return res.status(400).json({
         success: false,
-        message: '无效的操作'
+        message: 'Invalid action'
       });
     }
 
@@ -101,11 +112,11 @@ router.post('/applications/:applicationId/review', async (req, res) => {
 
     res.json({
       success: true,
-      message: action === 'approve' ? '申请已批准' : '申请已拒绝',
+      message: action === 'approve' ? 'Application approved' : 'Application rejected',
       application: reviewedApplication
     });
   } catch (error) {
-    if (error.message === '申请不存在' || error.message === '申请已被处理') {
+    if (error.message === 'Application does not exist' || error.message === 'Application already processed') {
       return res.status(400).json({
         success: false,
         message: error.message
@@ -115,30 +126,33 @@ router.post('/applications/:applicationId/review', async (req, res) => {
     console.error('Review application error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 获取所有群组（管理员用）
+/**
+ * Get all groups (admin use)
+ * Super admin can see all groups, other admins see only their managed/joined groups.
+ */
 router.get('/all', async (req, res) => {
   try {
     if (!req.user.roles.includes('super-admin')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
     const allGroups = await dataStore.getGroups();
     let userGroups = [];
 
-    // 超级管理员可以看到所有群组，其他管理员只能看到自己管理/加入的群组
+    // Super admin sees all groups, others see only their managed/joined groups
     if (req.user.roles.includes('super-admin')) {
       userGroups = allGroups;
     } else {
       userGroups = allGroups.filter(group => {
-        // 检查用户是否是群组成员或管理员（考虑populate后的对象格式）
+        // Check if user is a member or admin of the group
         const isMember = group.memberIds.some(member => {
           const memberId = member._id ? member._id.toString() : member.toString();
           return memberId === req.user.id.toString();
@@ -153,7 +167,7 @@ router.get('/all', async (req, res) => {
       });
     }
 
-    // 为每个群组添加channels信息
+    // Add channels info to each group
     const groupsWithChannels = await Promise.all(
       userGroups.map(async (group) => {
         const channels = await dataStore.getGroupChannels(group._id.toString());
@@ -173,12 +187,15 @@ router.get('/all', async (req, res) => {
     console.error('Get all groups error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 获取用户群组
+/**
+ * Get groups for the current user
+ * Super admin sees all groups, others see only their managed/joined groups.
+ */
 router.get('/', async (req, res) => {
   try {
     const allGroups = await dataStore.getGroups();
@@ -188,7 +205,7 @@ router.get('/', async (req, res) => {
       userGroups = allGroups;
     } else {
       userGroups = allGroups.filter(group => {
-        // 检查用户是否是群组成员或管理员（考虑populate后的对象格式）
+        // Check if user is a member or admin of the group
         const isMember = group.memberIds.some(member => {
           const memberId = member._id ? member._id.toString() : member.toString();
           return memberId === req.user.id.toString();
@@ -203,7 +220,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // 为每个群组添加channels信息
+    // Add channels info to each group
     const groupsWithChannels = await Promise.all(
       userGroups.map(async (group) => {
         const channels = await dataStore.getGroupChannels(group._id.toString());
@@ -223,12 +240,15 @@ router.get('/', async (req, res) => {
     console.error('Get groups error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 创建群组
+/**
+ * Create a new group
+ * Only group-admin or super-admin can create groups.
+ */
 router.post('/', async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -236,14 +256,14 @@ router.post('/', async (req, res) => {
     if (!name) {
       return res.status(400).json({
         success: false,
-        message: '群组名称不能为空'
+        message: 'Group name cannot be empty'
       });
     }
 
     if (!req.user.roles.includes('group-admin') && !req.user.roles.includes('super-admin')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足，需要群组管理员权限'
+        message: 'Insufficient permissions, group admin required'
       });
     }
 
@@ -262,14 +282,17 @@ router.post('/', async (req, res) => {
     console.error('Create group error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
 // PARAMETERIZED ROUTES AFTER STATIC ROUTES
 
-// 获取单个群组信息
+/**
+ * Get single group information
+ * Returns detailed information about a specific group including its channels.
+ */
 router.get('/:groupId', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -278,18 +301,18 @@ router.get('/:groupId', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'view')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
-    // 获取群组的频道
+    // Get group's channels
     const channels = await dataStore.getGroupChannels(groupId);
 
     res.json({
@@ -304,12 +327,15 @@ router.get('/:groupId', async (req, res) => {
     console.error('Get group error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 删除群组
+/**
+ * Delete group
+ * Removes a group from the system. Only super admins or group creators can delete groups.
+ */
 router.delete('/:groupId', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -318,18 +344,18 @@ router.delete('/:groupId', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
-    // 权限检查：超级管理员可以删除所有群组，群组管理员只能删除自己创建的群组
+    // Permission check: Super admins can delete all groups, group admins can only delete groups they created
     const isSuperAdmin = req.user.roles.includes('super-admin');
     const isCreator = group.createdBy.toString() === req.user.id.toString();
 
     if (!isSuperAdmin && !isCreator) {
       return res.status(403).json({
         success: false,
-        message: '权限不足，只有超级管理员或群组创建者可以删除群组'
+        message: 'Insufficient permissions, only super admin or group creator can delete groups'
       });
     }
 
@@ -338,12 +364,12 @@ router.delete('/:groupId', async (req, res) => {
     if (success) {
       res.json({
         success: true,
-        message: '群组已删除'
+        message: 'Group deleted successfully'
       });
     } else {
       res.status(500).json({
         success: false,
-        message: '删除群组失败'
+        message: 'Failed to delete group'
       });
     }
 
@@ -351,12 +377,15 @@ router.delete('/:groupId', async (req, res) => {
     console.error('Delete group error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 申请加入群组
+/**
+ * Apply to join group
+ * Submits an application to join a specific group.
+ */
 router.post('/:groupId/apply', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -366,11 +395,11 @@ router.post('/:groupId/apply', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
-    // 检查用户是否已经是成员 (考虑populate后的对象格式)
+    // Check if user is already a member (considering populated object format)
     const isMember = group.memberIds.some(member => {
       const memberId = member._id ? member._id.toString() : member.toString();
       return memberId === req.user.id.toString();
@@ -384,7 +413,7 @@ router.post('/:groupId/apply', async (req, res) => {
     if (isMember || isAdmin) {
       return res.status(400).json({
         success: false,
-        message: '您已经是该群组的成员'
+        message: 'You are already a member of this group'
       });
     }
 
@@ -396,26 +425,29 @@ router.post('/:groupId/apply', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: '申请已提交，等待管理员审核',
+      message: 'Application submitted, waiting for admin review',
       application
     });
   } catch (error) {
     if (error.message === '已有待审核的申请') {
       return res.status(400).json({
         success: false,
-        message: error.message
+        message: 'You already have a pending application'
       });
     }
 
     console.error('Apply to group error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 获取群组的待审核申请（管理员用）
+/**
+ * Get group's pending applications (for admins)
+ * Returns all pending applications for a specific group.
+ */
 router.get('/:groupId/applications', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -424,14 +456,14 @@ router.get('/:groupId/applications', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'manage')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -445,12 +477,15 @@ router.get('/:groupId/applications', async (req, res) => {
     console.error('Get group applications error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 获取群组频道列表
+/**
+ * Get group channels list
+ * Returns all channels for a specific group.
+ */
 router.get('/:groupId/channels', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -459,14 +494,14 @@ router.get('/:groupId/channels', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'view')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -477,12 +512,15 @@ router.get('/:groupId/channels', async (req, res) => {
     console.error('Get channels error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 创建频道
+/**
+ * Create channel
+ * Creates a new channel within a group.
+ */
 router.post('/:groupId/channels', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -499,14 +537,14 @@ router.post('/:groupId/channels', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'manage')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -525,7 +563,7 @@ router.post('/:groupId/channels', async (req, res) => {
     console.error('Create channel error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
@@ -539,14 +577,14 @@ router.delete('/:groupId/channels/:channelId', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'manage')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -554,7 +592,7 @@ router.delete('/:groupId/channels/:channelId', async (req, res) => {
     if (!channel) {
       return res.status(404).json({
         success: false,
-        message: '频道未找到'
+        message: 'Channel not found'
       });
     }
 
@@ -576,7 +614,7 @@ router.delete('/:groupId/channels/:channelId', async (req, res) => {
     } else {
       res.status(500).json({
         success: false,
-        message: '删除频道失败'
+        message: 'Failed to delete channel'
       });
     }
 
@@ -584,7 +622,7 @@ router.delete('/:groupId/channels/:channelId', async (req, res) => {
     console.error('Delete channel error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
@@ -598,7 +636,7 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: '用户ID不能为空'
+        message: 'User ID cannot be empty'
       });
     }
 
@@ -606,14 +644,14 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'manage')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -621,7 +659,7 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     if (!channel) {
       return res.status(404).json({
         success: false,
-        message: '频道未找到'
+        message: 'Channel not found'
       });
     }
 
@@ -629,11 +667,11 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
-    // 检查用户是否已在频道中
+    // Check if user is already in the channel
     const isAlreadyMember = channel.memberIds.some(memberId => {
       const id = memberId._id ? memberId._id.toString() : memberId.toString();
       return id === userId.toString();
@@ -642,7 +680,7 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     if (isAlreadyMember) {
       return res.status(400).json({
         success: false,
-        message: '用户已在频道中'
+        message: 'User is already in the channel'
       });
     }
 
@@ -652,12 +690,12 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     if (success) {
       res.json({
         success: true,
-        message: '用户已添加到频道'
+        message: 'User added to channel successfully'
       });
     } else {
       res.status(500).json({
         success: false,
-        message: '添加用户失败'
+        message: 'Failed to add user'
       });
     }
 
@@ -665,7 +703,7 @@ router.post('/:groupId/channels/:channelId/members', async (req, res) => {
     console.error('Add user to channel error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
@@ -679,14 +717,14 @@ router.delete('/:groupId/channels/:channelId/members/:userId', async (req, res) 
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'manage')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -694,11 +732,11 @@ router.delete('/:groupId/channels/:channelId/members/:userId', async (req, res) 
     if (!channel) {
       return res.status(404).json({
         success: false,
-        message: '频道未找到'
+        message: 'Channel not found'
       });
     }
 
-    // 检查用户是否在频道中
+    // Check if user is in the channel
     const isMember = channel.memberIds.some(memberId => {
       const id = memberId._id ? memberId._id.toString() : memberId.toString();
       return id === userId.toString();
@@ -707,7 +745,7 @@ router.delete('/:groupId/channels/:channelId/members/:userId', async (req, res) 
     if (!isMember) {
       return res.status(400).json({
         success: false,
-        message: '用户不在频道中'
+        message: 'User is not in the channel'
       });
     }
 
@@ -717,12 +755,12 @@ router.delete('/:groupId/channels/:channelId/members/:userId', async (req, res) 
     if (success) {
       res.json({
         success: true,
-        message: '用户已从频道移除'
+        message: 'User removed from channel successfully'
       });
     } else {
       res.status(500).json({
         success: false,
-        message: '移除用户失败'
+        message: 'Failed to remove user'
       });
     }
 
@@ -730,12 +768,12 @@ router.delete('/:groupId/channels/:channelId/members/:userId', async (req, res) 
     console.error('Remove user from channel error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 添加成员到群组
+/**\\n * Add member to group\\n * Adds a user as a member to a specific group.\\n */
 router.post('/:groupId/members', async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -744,7 +782,7 @@ router.post('/:groupId/members', async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: '用户ID不能为空'
+        message: 'User ID cannot be empty'
       });
     }
 
@@ -752,14 +790,14 @@ router.post('/:groupId/members', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'manage')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -767,7 +805,7 @@ router.post('/:groupId/members', async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
@@ -776,12 +814,12 @@ router.post('/:groupId/members', async (req, res) => {
     if (success) {
       res.json({
         success: true,
-        message: '用户已添加到群组'
+        message: 'User added to group successfully'
       });
     } else {
       res.status(500).json({
         success: false,
-        message: '添加用户失败'
+        message: 'Failed to add user'
       });
     }
 
@@ -789,12 +827,12 @@ router.post('/:groupId/members', async (req, res) => {
     console.error('Add user to group error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 从群组移除成员
+/**\\n * Remove member from group\\n * Removes a user from a specific group.\\n */
 router.delete('/:groupId/members/:userId', async (req, res) => {
   try {
     const { groupId, userId } = req.params;
@@ -803,14 +841,14 @@ router.delete('/:groupId/members/:userId', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'manage')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -819,12 +857,12 @@ router.delete('/:groupId/members/:userId', async (req, res) => {
     if (success) {
       res.json({
         success: true,
-        message: '用户已从群组移除'
+        message: 'User removed from group successfully'
       });
     } else {
       res.status(500).json({
         success: false,
-        message: '移除用户失败'
+        message: 'Failed to remove user'
       });
     }
 
@@ -832,21 +870,21 @@ router.delete('/:groupId/members/:userId', async (req, res) => {
     console.error('Remove user from group error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 提升成员为群组管理员（仅限超级管理员）
+/**\\n * Promote member to group admin (super admin only)\\n * Promotes a group member to administrator role.\\n */
 router.put('/:groupId/members/:userId/promote', async (req, res) => {
   try {
     const { groupId, userId } = req.params;
 
-    // 检查权限：只有超级管理员可以提升群组管理员
+    // Check permissions: Only super admin can promote group administrators
     if (!req.user.roles.includes('super-admin')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足，只有超级管理员可以提升群组管理员'
+        message: 'Insufficient permissions, only super admin can promote group administrators'
       });
     }
 
@@ -854,7 +892,7 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
@@ -862,11 +900,11 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
-    // 检查用户是否已经是群组管理员
+    // Check if user is already a group administrator
     const isAlreadyAdmin = group.adminIds.some(adminId => {
       const id = adminId._id ? adminId._id.toString() : adminId.toString();
       return id === userId.toString();
@@ -875,11 +913,11 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     if (isAlreadyAdmin) {
       return res.status(400).json({
         success: false,
-        message: '该用户已经是群组管理员'
+        message: 'This user is already a group administrator'
       });
     }
 
-    // 检查用户是否是群组成员
+    // Check if user is a group member
     const isMember = group.memberIds.some(memberId => {
       const id = memberId._id ? memberId._id.toString() : memberId.toString();
       return id === userId.toString();
@@ -888,11 +926,11 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     if (!isMember) {
       return res.status(400).json({
         success: false,
-        message: '用户必须先是群组成员才能被提升为管理员'
+        message: 'User must be a group member first before being promoted to administrator'
       });
     }
 
-    // 提升用户为群组管理员
+    // Promote user to group administrator
     const success = await dataStore.promoteUserToGroupAdmin(groupId, userId);
 
     if (success) {
@@ -911,7 +949,7 @@ router.put('/:groupId/members/:userId/promote', async (req, res) => {
     console.error('Promote user to group admin error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
@@ -933,7 +971,7 @@ router.put('/:groupId/members/:userId/demote', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
@@ -941,7 +979,7 @@ router.put('/:groupId/members/:userId/demote', async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
@@ -977,7 +1015,7 @@ router.put('/:groupId/members/:userId/demote', async (req, res) => {
     console.error('Demote user from group admin error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
@@ -992,14 +1030,14 @@ router.get('/:groupId/channels/:channelId/messages', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
     if (!hasPermission(req.user, group, 'view')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足'
+        message: 'Insufficient permissions'
       });
     }
 
@@ -1007,7 +1045,7 @@ router.get('/:groupId/channels/:channelId/messages', async (req, res) => {
     if (!channel) {
       return res.status(404).json({
         success: false,
-        message: '频道未找到'
+        message: 'Channel not found'
       });
     }
 
@@ -1037,7 +1075,7 @@ router.get('/:groupId/channels/:channelId/messages', async (req, res) => {
     console.error('Get channel messages error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
@@ -1071,7 +1109,7 @@ router.post('/:groupId/channels/:channelId/messages', async (req, res) => {
     if (!group) {
       return res.status(404).json({
         success: false,
-        message: '群组未找到'
+        message: 'Group not found'
       });
     }
 
@@ -1079,7 +1117,7 @@ router.post('/:groupId/channels/:channelId/messages', async (req, res) => {
     if (!channel) {
       return res.status(404).json({
         success: false,
-        message: '频道未找到'
+        message: 'Channel not found'
       });
     }
 
@@ -1126,7 +1164,7 @@ router.post('/:groupId/channels/:channelId/messages', async (req, res) => {
     console.error('Send message error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });

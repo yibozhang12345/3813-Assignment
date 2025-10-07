@@ -5,6 +5,10 @@ const { generateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+/**
+ * User login endpoint
+ * Validates username and password, returns JWT token on success.
+ */
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -12,7 +16,7 @@ router.post('/login', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: '用户名和密码不能为空'
+        message: 'Username and password cannot be empty'
       });
     }
 
@@ -21,7 +25,7 @@ router.post('/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: '用户名或密码错误'
+        message: 'Invalid username or password'
       });
     }
 
@@ -36,7 +40,7 @@ router.post('/login', async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: '用户名或密码错误'
+        message: 'Invalid username or password'
       });
     }
 
@@ -60,11 +64,15 @@ router.post('/login', async (req, res) => {
     console.error('Login error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
+/**
+ * User registration endpoint
+ * Registers a new user with username, email, and password.
+ */
 router.post('/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -72,7 +80,7 @@ router.post('/register', async (req, res) => {
     if (!username || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: '所有字段都是必需的'
+        message: 'All fields are required'
       });
     }
 
@@ -80,7 +88,7 @@ router.post('/register', async (req, res) => {
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: '用户名已存在'
+        message: 'Username already exists'
       });
     }
 
@@ -102,18 +110,22 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       success: true,
       user: userResponse,
-      message: '用户注册成功'
+      message: 'User registered successfully'
     });
 
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
+/**
+ * Get all users
+ * Returns a list of all users (public endpoint).
+ */
 router.get('/users', async (req, res) => {
   try {
     const users = await dataStore.getUsers();
@@ -135,11 +147,15 @@ router.get('/users', async (req, res) => {
     console.error('Get users error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
+/**
+ * Promote user to group-admin or super-admin
+ * Adds a role to the user if not already present.
+ */
 router.put('/users/:id/promote', async (req, res) => {
   try {
     const { id } = req.params;
@@ -148,7 +164,7 @@ router.put('/users/:id/promote', async (req, res) => {
     if (!['group-admin', 'super-admin'].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: '无效的角色'
+        message: 'Invalid role'
       });
     }
 
@@ -156,11 +172,11 @@ router.put('/users/:id/promote', async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
-    // 确保user.roles存在并且是数组
+    // Ensure user.roles exists and is an array
     if (!user.roles || !Array.isArray(user.roles)) {
       user.roles = ['user'];
     }
@@ -172,18 +188,22 @@ router.put('/users/:id/promote', async (req, res) => {
 
     res.json({
       success: true,
-      message: '用户权限已更新'
+      message: 'User permissions updated'
     });
 
   } catch (error) {
     console.error('Promote user error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
+/**
+ * Demote user from group-admin or super-admin
+ * Removes a role from the user, always keeps at least 'user' role.
+ */
 router.put('/users/:id/demote', async (req, res) => {
   try {
     const { id } = req.params;
@@ -192,7 +212,7 @@ router.put('/users/:id/demote', async (req, res) => {
     if (!['group-admin', 'super-admin'].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: '无效的角色'
+        message: 'Invalid role'
       });
     }
 
@@ -200,19 +220,19 @@ router.put('/users/:id/demote', async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
-    // 确保user.roles存在并且是数组
+    // Ensure user.roles exists and is an array
     if (!user.roles || !Array.isArray(user.roles)) {
       user.roles = ['user'];
     }
 
-    // 从角色列表中移除指定角色
+    // Remove the specified role from the list
     if (user.roles.includes(role)) {
       user.roles = user.roles.filter(r => r !== role);
-      // 确保至少保留user角色
+      // Always keep at least 'user' role
       if (!user.roles.includes('user')) {
         user.roles.push('user');
       }
@@ -221,18 +241,22 @@ router.put('/users/:id/demote', async (req, res) => {
 
     res.json({
       success: true,
-      message: '用户权限已更新'
+      message: 'User permissions updated'
     });
 
   } catch (error) {
     console.error('Demote user error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
+/**
+ * Delete a user (requires authentication)
+ * Prevents deleting your own account.
+ */
 router.delete('/users/:id', require('../middleware/auth').authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -240,7 +264,7 @@ router.delete('/users/:id', require('../middleware/auth').authenticateToken, asy
     if (id === req.user.id) {
       return res.status(400).json({
         success: false,
-        message: '不能删除自己的账户'
+        message: 'You cannot delete your own account'
       });
     }
 
@@ -249,61 +273,64 @@ router.delete('/users/:id', require('../middleware/auth').authenticateToken, asy
     if (!success) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
     res.json({
       success: true,
-      message: '用户已删除'
+      message: 'User deleted'
     });
 
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// 管理员创建用户
+/**
+ * Admin create user endpoint
+ * Only super-admin and group-admin can create users.
+ */
 router.post('/admin/create-user', require('../middleware/auth').authenticateToken, async (req, res) => {
   try {
     const { username, email, password, roles = ['user'] } = req.body;
 
-    // 检查权限：只有super-admin和group-admin可以创建用户
+    // Permission check: only super-admin and group-admin can create users
     if (!req.user.roles.includes('super-admin') && !req.user.roles.includes('group-admin')) {
       return res.status(403).json({
         success: false,
-        message: '权限不足，需要管理员权限'
+        message: 'Insufficient permissions, admin role required'
       });
     }
 
     if (!username || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: '用户名、邮箱和密码不能为空'
+        message: 'Username, email, and password cannot be empty'
       });
     }
 
-    // 检查用户名长度
+    // Check username length
     if (username.length < 3 || username.length > 20) {
       return res.status(400).json({
         success: false,
-        message: '用户名长度必须在3-20个字符之间'
+        message: 'Username length must be between 3 and 20 characters'
       });
     }
 
-    // 检查密码长度
+    // Check password length
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: '密码长度不能少于6个字符'
+        message: 'Password must be at least 6 characters long'
       });
     }
 
-    // 加密密码
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await dataStore.createUserByAdmin({
@@ -324,11 +351,11 @@ router.post('/admin/create-user', require('../middleware/auth').authenticateToke
     res.status(201).json({
       success: true,
       user: userResponse,
-      message: '用户创建成功'
+      message: 'User created successfully'
     });
 
   } catch (error) {
-    if (error.message === '用户名或邮箱已存在') {
+    if (error.message === 'Username or email already exists') {
       return res.status(409).json({
         success: false,
         message: error.message
@@ -338,7 +365,7 @@ router.post('/admin/create-user', require('../middleware/auth').authenticateToke
     console.error('Admin create user error:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });

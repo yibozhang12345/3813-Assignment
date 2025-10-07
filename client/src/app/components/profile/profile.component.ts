@@ -12,8 +12,8 @@ import { Router } from '@angular/router';
   template: `
     <div class="profile-container">
       <div class="profile-header">
-        <h2>个人资料</h2>
-        <button class="btn-secondary" (click)="goBack()">返回</button>
+        <h2>Profile</h2>
+        <button class="btn-secondary" (click)="goBack()">Back</button>
       </div>
 
       <div class="profile-content">
@@ -27,7 +27,7 @@ import { Router } from '@angular/router';
               (error)="onAvatarError($event)"
             />
             <div class="avatar-overlay" (click)="triggerFileInput()">
-              <span>更换头像</span>
+              <span>Change Avatar</span>
             </div>
           </div>
 
@@ -41,14 +41,14 @@ import { Router } from '@angular/router';
 
           <div class="avatar-actions">
             <button class="btn-primary" (click)="triggerFileInput()">
-              上传头像
+              Upload Avatar
             </button>
             <button
               class="btn-danger"
               (click)="removeAvatar()"
               *ngIf="profile?.avatar"
             >
-              删除头像
+              Delete Avatar
             </button>
           </div>
         </div>
@@ -57,7 +57,7 @@ import { Router } from '@angular/router';
         <div class="profile-form">
           <form (ngSubmit)="updateProfile()" #profileForm="ngForm">
             <div class="form-group">
-              <label for="username">用户名</label>
+              <label for="username">Username</label>
               <input
                 id="username"
                 type="text"
@@ -71,7 +71,7 @@ import { Router } from '@angular/router';
             </div>
 
             <div class="form-group">
-              <label for="email">邮箱</label>
+              <label for="email">Email</label>
               <input
                 id="email"
                 type="email"
@@ -83,7 +83,7 @@ import { Router } from '@angular/router';
             </div>
 
             <div class="form-group">
-              <label>角色</label>
+              <label>Role</label>
               <div class="roles-display">
                 <span
                   *ngFor="let role of profile?.roles"
@@ -103,7 +103,7 @@ import { Router } from '@angular/router';
                 class="btn-primary"
                 [disabled]="!profileForm.valid || isLoading"
               >
-                {{ isLoading ? '保存中...' : '保存更改' }}
+                {{ isLoading ? 'Saving...' : 'Save Changes' }}
               </button>
             </div>
           </form>
@@ -371,7 +371,7 @@ export class ProfileComponent implements OnInit {
 
   loadProfile(): void {
     this.isLoading = true;
-    this.loadingMessage = '加载用户资料...';
+    this.loadingMessage = 'Loading user profile...';
 
     this.profileService.getMyProfile().subscribe({
       next: (profile) => {
@@ -383,8 +383,8 @@ export class ProfileComponent implements OnInit {
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('加载用户资料失败:', error);
-        alert('加载用户资料失败: ' + (error.error?.message || error.message));
+        console.error('Failed to load user profile:', error);
+        alert('Failed to load user profile: ' + (error.error?.message || error.message));
         this.isLoading = false;
       }
     });
@@ -392,24 +392,24 @@ export class ProfileComponent implements OnInit {
 
   updateProfile(): void {
     if (!this.formData.username.trim() || !this.formData.email.trim()) {
-      alert('请填写所有必填字段');
+      alert('Please fill in all required fields');
       return;
     }
 
     this.isLoading = true;
-    this.loadingMessage = '保存更改...';
+    this.loadingMessage = 'Saving changes...';
 
     this.profileService.updateProfile(this.formData).subscribe({
       next: (updatedProfile) => {
         this.profile = updatedProfile;
         // Update auth service with new user data
         this.authService.updateCurrentUser(updatedProfile);
-        alert('个人资料更新成功');
+        alert('Profile updated successfully');
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('更新个人资料失败:', error);
-        alert('更新失败: ' + (error.error?.message || error.message));
+        console.error('Failed to update profile:', error);
+        alert('Update failed: ' + (error.error?.message || error.message));
         this.isLoading = false;
       }
     });
@@ -426,32 +426,32 @@ export class ProfileComponent implements OnInit {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('请选择图片文件');
+      alert('Please select an image file');
       return;
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('文件大小不能超过5MB');
+      alert('File size cannot exceed 5MB');
       return;
     }
 
     this.isLoading = true;
-    this.loadingMessage = '上传头像...';
+    this.loadingMessage = 'Uploading avatar...';
 
     this.profileService.uploadAvatar(file).subscribe({
       next: (response) => {
         this.profile = response.user;
         this.authService.updateCurrentUser(response.user);
-        alert('头像上传成功');
+        alert('Avatar uploaded successfully');
         this.isLoading = false;
 
         // Clear file input
         event.target.value = '';
       },
       error: (error) => {
-        console.error('上传头像失败:', error);
-        alert('上传失败: ' + (error.error?.message || error.message));
+        console.error('Upload failed:', error);
+        alert('Upload failed: ' + (error.error?.message || error.message));
         this.isLoading = false;
 
         // Clear file input
@@ -461,21 +461,21 @@ export class ProfileComponent implements OnInit {
   }
 
   removeAvatar(): void {
-    if (!confirm('确定要删除头像吗？')) return;
+    if (!confirm('Are you sure you want to delete the avatar?')) return;
 
     this.isLoading = true;
-    this.loadingMessage = '删除头像...';
+    this.loadingMessage = 'Deleting avatar...';
 
     this.profileService.deleteAvatar().subscribe({
       next: (response) => {
         this.profile = response.user;
         this.authService.updateCurrentUser(response.user);
-        alert('头像删除成功');
+        alert('Avatar deleted successfully');
         this.isLoading = false;
       },
       error: (error) => {
-        console.error('删除头像失败:', error);
-        alert('删除失败: ' + (error.error?.message || error.message));
+        console.error('Delete failed:', error);
+        alert('Delete failed: ' + (error.error?.message || error.message));
         this.isLoading = false;
       }
     });
@@ -491,9 +491,9 @@ export class ProfileComponent implements OnInit {
 
   getRoleDisplayName(role: string): string {
     switch (role) {
-      case 'super-admin': return '超级管理员';
-      case 'group-admin': return '群组管理员';
-      case 'user': return '用户';
+      case 'super-admin': return 'Super Administrator';
+      case 'group-admin': return 'Group Administrator';
+      case 'user': return 'User';
       default: return role;
     }
   }

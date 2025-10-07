@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+/**
+ * User Schema
+ * Defines the structure for user documents in the database.
+ */
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -47,7 +51,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// 密码加密中间件
+// Password encryption middleware
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
 
@@ -60,24 +64,41 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// 密码验证方法
+/**
+ * Compare password method
+ * Compares a candidate password with the user's hashed password.
+ * @param {string} candidatePassword - Password to compare
+ * @returns {boolean} True if passwords match
+ */
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// 转换为JSON时隐藏密码
+/**
+ * Convert to JSON method
+ * Removes password field when converting to JSON.
+ * @returns {Object} User object without password
+ */
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
   return user;
 };
 
-// 静态方法：根据用户名查找用户
+/**
+ * Static method: Find user by username
+ * @param {string} username - Username to search for
+ * @returns {Object} User document
+ */
 userSchema.statics.findByUsername = function(username) {
   return this.findOne({ username: username });
 };
 
-// 静态方法：检查用户是否具有特定角色
+/**
+ * Check if user has specific role
+ * @param {string} role - Role to check for
+ * @returns {boolean} True if user has the role
+ */
 userSchema.methods.hasRole = function(role) {
   return this.roles.includes(role);
 };

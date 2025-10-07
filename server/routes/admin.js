@@ -4,46 +4,55 @@ const { authenticateToken, requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// 获取所有用户 (仅超级管理员)
+/**
+ * Get all users (super admin only)
+ * Returns a list of all users in the system.
+ */
 router.get('/users', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const users = await mongoDataStore.getUsers();
     res.json(users);
   } catch (error) {
-    console.error('获取用户列表失败:', error);
+    console.error('Failed to get user list:', error);
     res.status(500).json({
       success: false,
-      message: '获取用户列表失败',
+      message: 'Failed to get user list',
       error: error.message
     });
   }
 });
 
-// 获取所有群组 (仅超级管理员)
+/**
+ * Get all groups (super admin only)
+ * Returns a list of all groups in the system.
+ */
 router.get('/groups', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const groups = await mongoDataStore.getGroups();
     res.json(groups);
   } catch (error) {
-    console.error('获取群组列表失败:', error);
+    console.error('Failed to get group list:', error);
     res.status(500).json({
       success: false,
-      message: '获取群组列表失败',
+      message: 'Failed to get group list',
       error: error.message
     });
   }
 });
 
-// 删除用户 (仅超级管理员)
+/**
+ * Delete a user (super admin only)
+ * Prevents deleting your own account.
+ */
 router.delete('/users/:userId', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // 防止删除超级管理员自己
+    // Prevent deleting your own super admin account
     if (req.user.id === userId) {
       return res.status(400).json({
         success: false,
-        message: '不能删除自己的账户'
+        message: 'You cannot delete your own account'
       });
     }
 
@@ -52,25 +61,28 @@ router.delete('/users/:userId', authenticateToken, requireSuperAdmin, async (req
     if (result) {
       res.json({
         success: true,
-        message: '用户删除成功'
+        message: 'User deleted successfully'
       });
     } else {
       res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
   } catch (error) {
-    console.error('删除用户失败:', error);
+    console.error('Failed to delete user:', error);
     res.status(500).json({
       success: false,
-      message: '删除用户失败',
+      message: 'Failed to delete user',
       error: error.message
     });
   }
 });
 
-// 更新用户角色 (仅超级管理员)
+/**
+ * Update user roles (super admin only)
+ * Prevents removing your own super admin role.
+ */
 router.put('/users/:userId/roles', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -79,26 +91,26 @@ router.put('/users/:userId/roles', authenticateToken, requireSuperAdmin, async (
     if (!Array.isArray(roles)) {
       return res.status(400).json({
         success: false,
-        message: '角色必须是数组格式'
+        message: 'Roles must be an array'
       });
     }
 
-    // 验证角色
+    // Validate roles
     const validRoles = ['user', 'group-admin', 'super-admin'];
     const invalidRoles = roles.filter(role => !validRoles.includes(role));
 
     if (invalidRoles.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `无效的角色: ${invalidRoles.join(', ')}`
+        message: `Invalid roles: ${invalidRoles.join(', ')}`
       });
     }
 
-    // 防止移除自己的超级管理员权限
+    // Prevent removing your own super admin role
     if (req.user.id === userId && !roles.includes('super-admin')) {
       return res.status(400).json({
         success: false,
-        message: '不能移除自己的超级管理员权限'
+        message: 'You cannot remove your own super admin role'
       });
     }
 
@@ -107,20 +119,20 @@ router.put('/users/:userId/roles', authenticateToken, requireSuperAdmin, async (
     if (updatedUser) {
       res.json({
         success: true,
-        message: '用户角色更新成功',
+        message: 'User roles updated successfully',
         user: updatedUser
       });
     } else {
       res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
   } catch (error) {
-    console.error('更新用户角色失败:', error);
+    console.error('Failed to update user roles:', error);
     res.status(500).json({
       success: false,
-      message: '更新用户角色失败',
+      message: 'Failed to update user roles',
       error: error.message
     });
   }

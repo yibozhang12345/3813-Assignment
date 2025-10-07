@@ -30,7 +30,7 @@ const fileFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
-    cb(new Error('只允许上传图片文件'), false);
+    cb(new Error('Only image files are allowed'), false);
   }
 };
 
@@ -45,14 +45,17 @@ const upload = multer({
 // Apply authentication to all routes
 router.use(authenticateToken);
 
-// Get current user profile
+/**
+ * Get current user profile
+ * Returns the profile information of the authenticated user.
+ */
 router.get('/me', async (req, res) => {
   try {
     const user = await dataStore.findUserById(req.user.id);
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
@@ -61,15 +64,18 @@ router.get('/me', async (req, res) => {
       user: user
     });
   } catch (error) {
-    console.error('获取用户资料失败:', error);
+    console.error('Failed to get user profile:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// Update user profile
+/**
+ * Update user profile
+ * Updates the username and/or email of the authenticated user.
+ */
 router.put('/me', async (req, res) => {
   try {
     const { username, email } = req.body;
@@ -86,40 +92,43 @@ router.put('/me', async (req, res) => {
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
     res.json({
       success: true,
-      message: '个人资料更新成功',
+      message: 'Profile updated successfully',
       user: updatedUser
     });
   } catch (error) {
-    console.error('更新用户资料失败:', error);
+    console.error('Failed to update user profile:', error);
 
     if (error.code === 11000) {
       const field = Object.keys(error.keyValue)[0];
       return res.status(400).json({
         success: false,
-        message: `${field === 'username' ? '用户名' : '邮箱'}已存在`
+        message: `${field === 'username' ? 'Username' : 'Email'} already exists`
       });
     }
 
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });
 
-// Upload avatar
+/**
+ * Upload avatar
+ * Uploads a new avatar image for the authenticated user.
+ */
 router.post('/avatar', upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: '请选择要上传的头像文件'
+        message: 'Please select an avatar file to upload'
       });
     }
 
@@ -140,41 +149,44 @@ router.post('/avatar', upload.single('avatar'), async (req, res) => {
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
-        message: '用户未找到'
+        message: 'User not found'
       });
     }
 
     res.json({
       success: true,
-      message: '头像上传成功',
+      message: 'Avatar uploaded successfully',
       avatar: avatarUrl,
       user: updatedUser
     });
   } catch (error) {
-    console.error('上传头像失败:', error);
+    console.error('Failed to upload avatar:', error);
 
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
-        message: '文件大小不能超过5MB'
+        message: 'File size cannot exceed 5MB'
       });
     }
 
     res.status(500).json({
       success: false,
-      message: '服务器错误: ' + error.message
+      message: 'Server error: ' + error.message
     });
   }
 });
 
-// Delete avatar
+/**
+ * Delete avatar
+ * Removes the avatar image of the authenticated user.
+ */
 router.delete('/avatar', async (req, res) => {
   try {
     const currentUser = await dataStore.findUserById(req.user.id);
     if (!currentUser || !currentUser.avatar) {
       return res.status(404).json({
         success: false,
-        message: '未找到头像'
+        message: 'Avatar not found'
       });
     }
 
@@ -189,14 +201,14 @@ router.delete('/avatar', async (req, res) => {
 
     res.json({
       success: true,
-      message: '头像删除成功',
+      message: 'Avatar deleted successfully',
       user: updatedUser
     });
   } catch (error) {
-    console.error('删除头像失败:', error);
+    console.error('Failed to delete avatar:', error);
     res.status(500).json({
       success: false,
-      message: '服务器错误'
+      message: 'Server error'
     });
   }
 });

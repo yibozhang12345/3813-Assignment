@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 
+/**
+ * Channel Schema
+ * Defines the structure for channel documents in the database.
+ */
 const channelSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -40,17 +44,25 @@ const channelSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// 索引
+// Indexes
 channelSchema.index({ groupId: 1 });
 channelSchema.index({ memberIds: 1 });
 channelSchema.index({ name: 1, groupId: 1 });
 
-// 实例方法：检查用户是否是频道成员
+/**
+ * Check if user is a channel member
+ * @param {string} userId - User ID to check
+ * @returns {boolean} True if user is a member
+ */
 channelSchema.methods.isMember = function(userId) {
   return this.memberIds.some(id => id.toString() === userId.toString());
 };
 
-// 实例方法：添加成员
+/**
+ * Add member to channel
+ * @param {string} userId - User ID to add
+ * @returns {Promise} Save operation result
+ */
 channelSchema.methods.addMember = function(userId) {
   if (!this.isMember(userId)) {
     this.memberIds.push(userId);
@@ -58,18 +70,27 @@ channelSchema.methods.addMember = function(userId) {
   return this.save();
 };
 
-// 实例方法：移除成员
+/**
+ * Remove member from channel
+ * @param {string} userId - User ID to remove
+ * @returns {Promise} Save operation result
+ */
 channelSchema.methods.removeMember = function(userId) {
   this.memberIds = this.memberIds.filter(id => id.toString() !== userId.toString());
   return this.save();
 };
 
-// 静态方法：获取群组的频道
+/**
+ * Static method: Get group's channels
+ * Returns all channels for a specific group.
+ * @param {string} groupId - Group ID
+ * @returns {Query} Mongoose query result
+ */
 channelSchema.statics.getGroupChannels = function(groupId) {
   return this.find({ groupId }).populate('memberIds', 'username email avatar');
 };
 
-// 更新最后活动时间的中间件
+// Middleware to update last activity time
 channelSchema.pre('save', function(next) {
   this.lastActivity = new Date();
   next();

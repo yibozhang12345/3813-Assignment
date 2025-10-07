@@ -15,7 +15,7 @@ import { FormsModule } from '@angular/forms';
   template: `
     <div class="dashboard-container">
       <header class="dashboard-header">
-        <h1>聊天系统</h1>
+        <h1>Chat System</h1>
         <div class="user-info">
           <div class="user-profile" (click)="goToProfile()">
             <img
@@ -31,18 +31,18 @@ import { FormsModule } from '@angular/forms';
               </span>
             </div>
           </div>
-          <button class="btn btn-secondary" (click)="logout()">退出</button>
+          <button class="btn btn-secondary" (click)="logout()">Logout</button>
         </div>
       </header>
 
       <div class="dashboard-content">
         <div class="groups-section">
-          <h2>我的群组</h2>
+          <h2>My Groups</h2>
 
           <div *ngIf="groups.length === 0" class="no-groups">
-            <p>您还没有加入任何群组</p>
+            <p>You haven't joined any groups yet</p>
             <button *ngIf="canCreateGroup()" class="btn btn-primary" (click)="showCreateGroup = true">
-              创建群组
+              Create Group
             </button>
           </div>
 
@@ -52,34 +52,34 @@ import { FormsModule } from '@angular/forms';
                 <h3>{{ group.name }}</h3>
                 <p>{{ group.description }}</p>
                 <div class="group-stats">
-                  <span>{{ (group.memberIds.length || 0) }} 成员</span>
-                  <span>{{ (group.channels.length || 0) }} 频道</span>
+                  <span>{{ (group.memberIds.length || 0) }} members</span>
+                  <span>{{ (group.channels.length || 0) }} channels</span>
                 </div>
-                <div *ngIf="isGroupAdminOf(group)" class="admin-badge">管理员</div>
+                <div *ngIf="isGroupAdminOf(group)" class="admin-badge">Admin</div>
               </div>
               <button
                 *ngIf="canDeleteGroup(group)"
                 class="btn btn-danger btn-small group-delete"
                 (click)="deleteGroup(group, $event)"
-                title="删除群组">
-                删除
+                title="Delete Group">
+                Delete
               </button>
             </div>
           </div>
 
           <div class="action-buttons">
             <button *ngIf="canCreateGroup()" class="btn btn-primary" (click)="showCreateGroup = true">
-              创建新群组
+              Create New Group
             </button>
           </div>
         </div>
 
         <!-- Available Groups Section for regular users -->
         <div class="available-groups-section">
-          <h2>可申请加入的群组</h2>
+          <h2>Available Groups to Join</h2>
 
           <div *ngIf="availableGroups.length === 0" class="no-groups">
-            <p>暂无可申请加入的群组</p>
+            <p>No available groups to apply for</p>
           </div>
 
           <div class="groups-list">
@@ -87,11 +87,11 @@ import { FormsModule } from '@angular/forms';
               <h3>{{ group.name }}</h3>
               <p>{{ group.description }}</p>
               <div class="group-stats">
-                <span>{{ (group.memberIds.length || 0) }} 成员</span>
-                <span>{{ (group.channels.length || 0) }} 频道</span>
+                <span>{{ (group.memberIds.length || 0) }} members</span>
+                <span>{{ (group.channels.length || 0) }} channels</span>
               </div>
               <button class="btn btn-primary btn-small" (click)="applyToGroup(group)">
-                申请加入
+                Apply to Join
               </button>
             </div>
           </div>
@@ -99,21 +99,21 @@ import { FormsModule } from '@angular/forms';
 
         <!-- Applications Management for Admins -->
         <div *ngIf="canManageGroups() && pendingApplications.length > 0" class="applications-section">
-          <h2>待审核申请</h2>
+          <h2>Pending Applications</h2>
           <div class="applications-list">
             <div *ngFor="let application of pendingApplications" class="application-item">
               <div class="application-info">
                 <h4>{{ application.username }}</h4>
-                <p>申请加入：{{ application.groupName }}</p>
-                <p *ngIf="application.message">申请理由：{{ application.message }}</p>
-                <small>申请时间：{{ application.appliedAt | date:'short' }}</small>
+                <p>Applying to join: {{ application.groupName }}</p>
+                <p *ngIf="application.message">Application reason: {{ application.message }}</p>
+                <small>Applied at: {{ application.appliedAt | date:'short' }}</small>
               </div>
               <div class="application-actions">
                 <button class="btn btn-success btn-small" (click)="reviewApplication(application, 'approve')">
-                  批准
+                  Approve
                 </button>
                 <button class="btn btn-danger btn-small" (click)="reviewApplication(application, 'reject')">
-                  拒绝
+                  Reject
                 </button>
               </div>
             </div>
@@ -122,32 +122,32 @@ import { FormsModule } from '@angular/forms';
 
         <!-- Admin Panel for Group Admins and Super Admins -->
         <div *ngIf="canManageGroups()" class="admin-section">
-          <h2>管理面板</h2>
+          <h2>Admin Panel</h2>
 
           <div class="admin-tabs">
             <button
               class="tab-btn"
               [class.active]="activeTab === 'users'"
               (click)="activeTab = 'users'">
-              用户管理
+              User Management
             </button>
             <button
               class="tab-btn"
               [class.active]="activeTab === 'groups'"
               (click)="activeTab = 'groups'">
-              群组管理
+              Group Management
             </button>
             <button
               *ngIf="isSuperAdmin()"
               class="tab-btn"
               [class.active]="activeTab === 'create-user'"
               (click)="activeTab = 'create-user'">
-              创建用户
+              Create User
             </button>
           </div>
 
           <div *ngIf="activeTab === 'users'" class="tab-content">
-            <h3>所有用户</h3>
+            <h3>All Users</h3>
             <div class="users-list">
               <div *ngFor="let user of allUsers" class="user-item">
                 <span>{{ user.username }}</span>
@@ -158,19 +158,19 @@ import { FormsModule } from '@angular/forms';
                     *ngIf="isSuperAdmin() && !user.roles.includes('group-admin')"
                     class="btn btn-small btn-primary"
                     (click)="promoteToGroupAdmin(user)">
-                    提升为群组管理员
+                    Promote to Group Admin
                   </button>
                   <button
                     *ngIf="isSuperAdmin() && user.roles.includes('group-admin') && user.id !== currentUser?.id"
                     class="btn btn-small btn-warning"
                     (click)="demoteFromGroupAdmin(user)">
-                    取消管理员权限
+                    Remove Admin Rights
                   </button>
                   <button
                     *ngIf="isSuperAdmin() && user.id !== currentUser?.id"
                     class="btn btn-small btn-danger"
                     (click)="deleteUser(user)">
-                    删除用户
+                    Delete User
                   </button>
                 </div>
               </div>
@@ -178,53 +178,53 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <div *ngIf="activeTab === 'groups'" class="tab-content">
-            <h3>所有群组</h3>
+            <h3>All Groups</h3>
             <div class="groups-admin-list">
               <div *ngFor="let group of allGroups" class="group-admin-item">
                 <h4>{{ group.name }}</h4>
                 <p>{{ group.description }}</p>
                 <div class="group-details">
-                  <span>创建者ID: {{ group.createdBy }}</span>
-                  <span>成员数: {{ group.memberIds.length || 0 }}</span>
+                  <span>Creator ID: {{ group.createdBy }}</span>
+                  <span>Member Count: {{ group.memberIds.length || 0 }}</span>
                 </div>
               </div>
             </div>
           </div>
 
           <div *ngIf="activeTab === 'create-user'" class="tab-content">
-            <h3>创建新用户</h3>
+            <h3>Create New User</h3>
             <form (ngSubmit)="createUser()" class="create-user-form">
               <div class="form-group">
-                <label for="username">用户名</label>
+                <label for="username">Username</label>
                 <input
                   id="username"
                   type="text"
                   [(ngModel)]="newUserUsername"
                   name="username"
-                  placeholder="请输入用户名"
+                  placeholder="Please enter username"
                   required>
               </div>
               <div class="form-group">
-                <label for="email">邮箱</label>
+                <label for="email">Email</label>
                 <input
                   id="email"
                   type="email"
                   [(ngModel)]="newUserEmail"
                   name="email"
-                  placeholder="请输入邮箱"
+                  placeholder="Please enter email"
                   required>
               </div>
               <div class="form-group">
-                <label for="password">密码</label>
+                <label for="password">Password</label>
                 <input
                   id="password"
                   type="password"
                   [(ngModel)]="newUserPassword"
                   name="password"
-                  placeholder="请输入密码"
+                  placeholder="Please enter password"
                   required>
               </div>
-              <button type="submit" class="btn btn-primary">创建用户</button>
+              <button type="submit" class="btn btn-primary">Create User</button>
             </form>
           </div>
         </div>
@@ -233,30 +233,30 @@ import { FormsModule } from '@angular/forms';
       <!-- Create Group Modal -->
       <div *ngIf="showCreateGroup" class="modal">
         <div class="modal-content">
-          <h3>创建新群组</h3>
+          <h3>Create New Group</h3>
           <form (ngSubmit)="createGroup()">
             <div class="form-group">
-              <label>群组名称:</label>
+              <label>Group Name:</label>
               <input
                 type="text"
                 [(ngModel)]="newGroupName"
                 name="groupName"
                 required
-                placeholder="请输入群组名称">
+                placeholder="Please enter group name">
             </div>
             <div class="form-group">
-              <label>群组描述:</label>
+              <label>Group Description:</label>
               <textarea
                 [(ngModel)]="newGroupDescription"
                 name="groupDescription"
-                placeholder="请输入群组描述（可选）">
+                placeholder="Please enter group description (optional)">
               </textarea>
             </div>
             <div class="modal-actions">
               <button type="button" class="btn btn-secondary" (click)="cancelCreateGroup()">
-                取消
+                Cancel
               </button>
-              <button type="submit" class="btn btn-primary">创建</button>
+              <button type="submit" class="btn btn-primary">Create</button>
             </div>
           </form>
         </div>
@@ -265,22 +265,22 @@ import { FormsModule } from '@angular/forms';
       <!-- Apply to Group Modal -->
       <div *ngIf="showApplyGroup" class="modal">
         <div class="modal-content">
-          <h3>申请加入群组：{{ selectedGroup?.name }}</h3>
+          <h3>Apply to Join Group: {{ selectedGroup?.name }}</h3>
           <form (ngSubmit)="submitApplication()">
             <div class="form-group">
-              <label>申请理由（可选）:</label>
+              <label>Application Reason (Optional):</label>
               <textarea
                 [(ngModel)]="applicationMessage"
                 name="applicationMessage"
-                placeholder="请简述您想加入此群组的原因..."
+                placeholder="Please briefly describe why you want to join this group..."
                 rows="4">
               </textarea>
             </div>
             <div class="modal-actions">
               <button type="button" class="btn btn-secondary" (click)="showApplyGroup = false; selectedGroup = null; applicationMessage = ''">
-                取消
+                Cancel
               </button>
-              <button type="submit" class="btn btn-primary">提交申请</button>
+              <button type="submit" class="btn btn-primary">Submit Application</button>
             </div>
           </form>
         </div>
@@ -789,44 +789,44 @@ export class DashboardComponent implements OnInit {
 
       const userId = user._id || user.id;
       if (!userId) {
-        alert('用户ID无效');
+        alert('Invalid user ID');
         return;
       }
       this.authService.updateUserRoles(userId, newRoles).subscribe({
         next: () => {
           this.loadAllUsers();
-          alert('用户权限已更新');
+          alert('User permissions updated successfully');
         },
         error: (error) => {
-          console.error('更新用户权限失败:', error);
-          alert('更新用户权限失败');
+          console.error('Failed to update user permissions:', error);
+          alert('Failed to update user permissions');
         }
       });
     }
   }
 
   demoteFromGroupAdmin(user: User): void {
-    if (confirm(`确定要取消用户 ${user.username} 的群组管理员权限吗？`)) {
+    if (confirm(`Are you sure you want to remove group admin rights from user ${user.username}?`)) {
       const userId = user._id || user.id;
       if (!userId) {
-        alert('用户ID无效');
+        alert('Invalid user ID');
         return;
       }
       this.authService.demoteUserRole(userId, 'group-admin').subscribe({
         next: () => {
           this.loadAllUsers();
-          alert('用户权限已更新');
+          alert('User permissions updated successfully');
         },
         error: (error) => {
-          console.error('更新用户权限失败:', error);
-          alert('更新用户权限失败');
+          console.error('Failed to update user permissions:', error);
+          alert('Failed to update user permissions');
         }
       });
     }
   }
 
   deleteUser(user: User): void {
-    if (confirm(`确定要删除用户 ${user.username} 吗？此操作不可恢复。`)) {
+    if (confirm(`Are you sure you want to delete user ${user.username}? This action cannot be undone.`)) {
       const userId = user._id || user.id;
       if (!userId) {
         alert('用户ID无效');
