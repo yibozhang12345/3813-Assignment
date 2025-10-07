@@ -54,6 +54,52 @@ import { FormsModule } from '@angular/forms';
           </div>
         </div>
 
+        <!-- Available Groups Section for regular users -->
+        <div class="available-groups-section">
+          <h2>可申请加入的群组</h2>
+
+          <div *ngIf="availableGroups.length === 0" class="no-groups">
+            <p>暂无可申请加入的群组</p>
+          </div>
+
+          <div class="groups-list">
+            <div *ngFor="let group of availableGroups" class="group-card available-group">
+              <h3>{{ group.name }}</h3>
+              <p>{{ group.description }}</p>
+              <div class="group-stats">
+                <span>{{ group.memberIds.length }} 成员</span>
+                <span>{{ group.channels.length }} 频道</span>
+              </div>
+              <button class="btn btn-primary btn-small" (click)="applyToGroup(group)">
+                申请加入
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Applications Management for Admins -->
+        <div *ngIf="canManageGroups() && pendingApplications.length > 0" class="applications-section">
+          <h2>待审核申请</h2>
+          <div class="applications-list">
+            <div *ngFor="let application of pendingApplications" class="application-item">
+              <div class="application-info">
+                <h4>{{ application.username }}</h4>
+                <p>申请加入：{{ application.groupName }}</p>
+                <p *ngIf="application.message">申请理由：{{ application.message }}</p>
+                <small>申请时间：{{ application.appliedAt | date:'short' }}</small>
+              </div>
+              <div class="application-actions">
+                <button class="btn btn-success btn-small" (click)="reviewApplication(application, 'approve')">
+                  批准
+                </button>
+                <button class="btn btn-danger btn-small" (click)="reviewApplication(application, 'reject')">
+                  拒绝
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Super Admin Panel -->
         <div *ngIf="isSuperAdmin()" class="admin-section">
           <h2>管理面板</h2>
@@ -70,6 +116,12 @@ import { FormsModule } from '@angular/forms';
               [class.active]="activeTab === 'groups'"
               (click)="activeTab = 'groups'">
               群组管理
+            </button>
+            <button
+              class="tab-btn"
+              [class.active]="activeTab === 'create-user'"
+              (click)="activeTab = 'create-user'">
+              创建用户
             </button>
           </div>
 
@@ -111,6 +163,43 @@ import { FormsModule } from '@angular/forms';
               </div>
             </div>
           </div>
+
+          <div *ngIf="activeTab === 'create-user'" class="tab-content">
+            <h3>创建新用户</h3>
+            <form (ngSubmit)="createUser()" class="create-user-form">
+              <div class="form-group">
+                <label for="username">用户名</label>
+                <input
+                  id="username"
+                  type="text"
+                  [(ngModel)]="newUserUsername"
+                  name="username"
+                  placeholder="请输入用户名"
+                  required>
+              </div>
+              <div class="form-group">
+                <label for="email">邮箱</label>
+                <input
+                  id="email"
+                  type="email"
+                  [(ngModel)]="newUserEmail"
+                  name="email"
+                  placeholder="请输入邮箱"
+                  required>
+              </div>
+              <div class="form-group">
+                <label for="password">密码</label>
+                <input
+                  id="password"
+                  type="password"
+                  [(ngModel)]="newUserPassword"
+                  name="password"
+                  placeholder="请输入密码"
+                  required>
+              </div>
+              <button type="submit" class="btn btn-primary">创建用户</button>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -141,6 +230,30 @@ import { FormsModule } from '@angular/forms';
                 取消
               </button>
               <button type="submit" class="btn btn-primary">创建</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Apply to Group Modal -->
+      <div *ngIf="showApplyGroup" class="modal">
+        <div class="modal-content">
+          <h3>申请加入群组：{{ selectedGroup?.name }}</h3>
+          <form (ngSubmit)="submitApplication()">
+            <div class="form-group">
+              <label>申请理由（可选）:</label>
+              <textarea
+                [(ngModel)]="applicationMessage"
+                name="applicationMessage"
+                placeholder="请简述您想加入此群组的原因..."
+                rows="4">
+              </textarea>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary" (click)="showApplyGroup = false; selectedGroup = null; applicationMessage = ''">
+                取消
+              </button>
+              <button type="submit" class="btn btn-primary">提交申请</button>
             </div>
           </form>
         </div>
@@ -351,6 +464,88 @@ import { FormsModule } from '@angular/forms';
       resize: vertical;
       min-height: 80px;
     }
+
+    .available-groups-section {
+      margin-top: 30px;
+    }
+
+    .available-group {
+      position: relative;
+    }
+
+    .available-group .btn {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+    }
+
+    .applications-section {
+      margin-top: 30px;
+    }
+
+    .applications-list {
+      margin-top: 15px;
+    }
+
+    .application-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      background: white;
+    }
+
+    .application-info h4 {
+      margin: 0 0 5px 0;
+      color: #333;
+    }
+
+    .application-info p {
+      margin: 2px 0;
+      color: #666;
+    }
+
+    .application-info small {
+      color: #999;
+    }
+
+    .application-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .create-user-form {
+      max-width: 400px;
+    }
+
+    .create-user-form .form-group {
+      margin-bottom: 20px;
+    }
+
+    .btn-success {
+      background-color: #28a745;
+      border-color: #28a745;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background-color: #218838;
+      border-color: #1e7e34;
+    }
+
+    .btn-danger {
+      background-color: #dc3545;
+      border-color: #dc3545;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background-color: #c82333;
+      border-color: #bd2130;
+    }
   `]
 })
 export class DashboardComponent implements OnInit {
@@ -358,11 +553,24 @@ export class DashboardComponent implements OnInit {
   groups: Group[] = [];
   allUsers: User[] = [];
   allGroups: Group[] = [];
+  availableGroups: Group[] = [];
+  pendingApplications: any[] = [];
   activeTab = 'users';
 
   showCreateGroup = false;
   newGroupName = '';
   newGroupDescription = '';
+
+  showCreateUser = false;
+  newUserUsername = '';
+  newUserEmail = '';
+  newUserPassword = '';
+
+  showApplyGroup = false;
+  selectedGroup: Group | null = null;
+  applicationMessage = '';
+
+  showApplications = false;
 
   constructor(
     private authService: AuthService,
@@ -373,28 +581,62 @@ export class DashboardComponent implements OnInit {
   ngOnInit(): void {
     this.currentUser = this.authService.getCurrentUser();
     this.loadUserGroups();
+    this.loadAvailableGroups();
 
     if (this.isSuperAdmin()) {
       this.loadAllUsers();
       this.loadAllGroups();
     }
+
+    if (this.canManageGroups()) {
+      this.loadPendingApplications();
+    }
   }
 
   loadUserGroups(): void {
-    this.groupService.getUserGroups().subscribe(groups => {
-      this.groups = groups;
+    // For super admin, load all groups; for others, load user groups
+    const groupsObservable = this.isSuperAdmin()
+      ? this.groupService.getAllGroups()
+      : this.groupService.getUserGroups();
+
+    groupsObservable.subscribe({
+      next: groups => {
+        console.log('User groups loaded:', groups);
+        console.log('First group structure:', groups[0]);
+        if (groups[0]) {
+          console.log('Group properties:', Object.keys(groups[0]));
+          console.log('Group _id:', groups[0]._id);
+          console.log('Group id:', groups[0].id);
+        }
+        this.groups = groups;
+      },
+      error: error => {
+        console.error('Error loading user groups:', error);
+      }
     });
   }
 
   loadAllUsers(): void {
-    this.authService.getAllUsers().subscribe(users => {
-      this.allUsers = users;
+    this.authService.getAllUsers().subscribe({
+      next: users => {
+        console.log('All users loaded:', users);
+        this.allUsers = users;
+      },
+      error: error => {
+        console.error('Error loading all users:', error);
+      }
     });
   }
 
   loadAllGroups(): void {
-    this.groupService.getAllGroups().subscribe(groups => {
-      this.allGroups = groups;
+    this.groupService.getAllGroups().subscribe({
+      next: groups => {
+        console.log('All groups loaded:', groups);
+        this.allGroups = groups;
+      },
+      error: error => {
+        console.error('Error loading all groups:', error);
+      }
     });
   }
 
@@ -423,11 +665,31 @@ export class DashboardComponent implements OnInit {
   }
 
   isGroupAdminOf(group: Group): boolean {
-    return this.currentUser ? group.adminIds.includes(this.currentUser.id) : false;
+    if (!this.currentUser) return false;
+
+    // adminIds 可能是字符串数组或对象数组
+    return group.adminIds.some(adminId => {
+      if (typeof adminId === 'string') {
+        return adminId === this.currentUser!.id;
+      } else if (typeof adminId === 'object' && adminId !== null) {
+        return (adminId as any)._id === this.currentUser!.id || (adminId as any).id === this.currentUser!.id;
+      }
+      return false;
+    });
   }
 
   enterGroup(group: Group): void {
-    this.router.navigate(['/chat', group.id]);
+    console.log('Group object:', group);
+
+    // 使用实际的群组ID（支持MongoDB的_id和标准id字段）
+    const groupId = group._id || group.id;
+    console.log('Entering group with ID:', groupId);
+
+    if (groupId) {
+      this.router.navigate(['/chat', groupId]);
+    } else {
+      console.error('No valid group ID found:', group);
+    }
   }
 
   createGroup(): void {
@@ -455,7 +717,12 @@ export class DashboardComponent implements OnInit {
         newRoles.push('group-admin');
       }
 
-      this.authService.updateUserRoles(user.id, newRoles).subscribe({
+      const userId = user._id || user.id;
+      if (!userId) {
+        alert('用户ID无效');
+        return;
+      }
+      this.authService.updateUserRoles(userId, newRoles).subscribe({
         next: () => {
           this.loadAllUsers();
           alert('用户权限已更新');
@@ -470,7 +737,12 @@ export class DashboardComponent implements OnInit {
 
   deleteUser(user: User): void {
     if (confirm(`确定要删除用户 ${user.username} 吗？此操作不可恢复。`)) {
-      this.authService.deleteUser(user.id).subscribe({
+      const userId = user._id || user.id;
+      if (!userId) {
+        alert('用户ID无效');
+        return;
+      }
+      this.authService.deleteUser(userId).subscribe({
         next: () => {
           this.loadAllUsers();
           alert('用户已删除');
@@ -481,6 +753,122 @@ export class DashboardComponent implements OnInit {
         }
       });
     }
+  }
+
+  // 加载可申请的群组
+  loadAvailableGroups(): void {
+    this.groupService.getAvailableGroups().subscribe({
+      next: groups => {
+        this.availableGroups = groups;
+        console.log('Available groups loaded:', groups);
+      },
+      error: error => {
+        console.error('Error loading available groups:', error);
+      }
+    });
+  }
+
+  // 加载待审核申请
+  loadPendingApplications(): void {
+    this.groupService.getPendingApplications().subscribe({
+      next: applications => {
+        this.pendingApplications = applications;
+        console.log('Pending applications loaded:', applications);
+      },
+      error: error => {
+        console.error('Error loading pending applications:', error);
+      }
+    });
+  }
+
+  // 申请加入群组
+  applyToGroup(group: Group): void {
+    this.selectedGroup = group;
+    this.showApplyGroup = true;
+  }
+
+  // 提交申请
+  submitApplication(): void {
+    if (!this.selectedGroup) return;
+
+    const groupId = this.selectedGroup._id || this.selectedGroup.id!;
+    this.groupService.applyToGroup(groupId, this.applicationMessage).subscribe({
+      next: success => {
+        if (success) {
+          alert('申请已提交，等待管理员审核');
+          this.showApplyGroup = false;
+          this.applicationMessage = '';
+          this.selectedGroup = null;
+          this.loadAvailableGroups();
+        } else {
+          alert('申请提交失败');
+        }
+      },
+      error: error => {
+        console.error('Apply to group error:', error);
+        alert('申请提交时发生错误');
+      }
+    });
+  }
+
+  // 审核申请
+  reviewApplication(application: any, action: 'approve' | 'reject'): void {
+    const message = action === 'reject' ? prompt('请输入拒绝原因（可选）:') || '' : '';
+
+    this.groupService.reviewApplication(application._id || application.id, action, message).subscribe({
+      next: success => {
+        if (success) {
+          alert(action === 'approve' ? '申请已批准' : '申请已拒绝');
+          this.loadPendingApplications();
+          this.loadUserGroups();
+        } else {
+          alert('操作失败');
+        }
+      },
+      error: error => {
+        console.error('Review application error:', error);
+        alert('操作时发生错误');
+      }
+    });
+  }
+
+  // 创建用户
+  createUser(): void {
+    if (!this.newUserUsername || !this.newUserEmail || !this.newUserPassword) {
+      alert('请填写所有必填字段');
+      return;
+    }
+
+    const userData = {
+      username: this.newUserUsername,
+      email: this.newUserEmail,
+      password: this.newUserPassword,
+      roles: ['user']
+    };
+
+    this.groupService.createUser(userData).subscribe({
+      next: user => {
+        alert('用户创建成功');
+        this.showCreateUser = false;
+        this.newUserUsername = '';
+        this.newUserEmail = '';
+        this.newUserPassword = '';
+        this.loadAllUsers();
+      },
+      error: error => {
+        console.error('Create user error:', error);
+        alert('创建用户失败：' + (error.error?.message || '未知错误'));
+      }
+    });
+  }
+
+  // 权限检查方法
+  canManageGroups(): boolean {
+    return this.currentUser?.roles.includes('group-admin') || this.isSuperAdmin();
+  }
+
+  canCreateUsers(): boolean {
+    return this.isSuperAdmin();
   }
 
   logout(): void {
