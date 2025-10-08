@@ -3,6 +3,7 @@ const express = require('express');
 // Import multer middleware for file uploads
 const multer = require('multer');
 // 引入path模块用于路径操作
+const path = require('path');
 // Import path module for path operations
 const fs = require('fs');
 // 引入uuid模块用于生成唯一标识符
